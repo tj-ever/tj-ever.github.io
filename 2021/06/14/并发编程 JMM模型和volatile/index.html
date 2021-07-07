@@ -17,11 +17,11 @@
   <meta http-equiv="window-target" content="_top" />
   
   
-  <title>并发编程中的JMM模型和volatile关键字 | Ever的个人博客</title>
+  <title>并发编程 JMM模型和volatile | Ever的个人博客</title>
   <meta name="description" content="计算机硬件结构      多CPU一个现代CPU除了处理器核心之外还包括寄存器、L1L2L3缓存这些存储设备、浮点运算单元、整数运算单元等一些辅助运算设备以及内部总线等。 一个多核的CPU也就是一个CPU上有多个处理器核心。比如说现在我们要在一台计算机上跑一个多线程的程序，因为是一个进程里的线程，所以需要一些共享一些存储变量，如果这台计算机都是单核单线程CPU的话，就意味着这个程序的不同线程需要经">
 <meta property="og:type" content="article">
-<meta property="og:title" content="并发编程中的JMM模型和volatile关键字">
-<meta property="og:url" content="https://tj-ever.github.io/2021/06/14/%E5%B9%B6%E5%8F%91%E7%BC%96%E7%A8%8B%E4%B8%AD%E7%9A%84JMM%E6%A8%A1%E5%9E%8B%E5%92%8Cvolatile%E5%85%B3%E9%94%AE%E5%AD%97/index.html">
+<meta property="og:title" content="并发编程 JMM模型和volatile">
+<meta property="og:url" content="https://tj-ever.github.io/2021/06/14/%E5%B9%B6%E5%8F%91%E7%BC%96%E7%A8%8B%20JMM%E6%A8%A1%E5%9E%8B%E5%92%8Cvolatile/index.html">
 <meta property="og:site_name" content="Ever的个人博客">
 <meta property="og:description" content="计算机硬件结构      多CPU一个现代CPU除了处理器核心之外还包括寄存器、L1L2L3缓存这些存储设备、浮点运算单元、整数运算单元等一些辅助运算设备以及内部总线等。 一个多核的CPU也就是一个CPU上有多个处理器核心。比如说现在我们要在一台计算机上跑一个多线程的程序，因为是一个进程里的线程，所以需要一些共享一些存储变量，如果这台计算机都是单核单线程CPU的话，就意味着这个程序的不同线程需要经">
 <meta property="og:locale" content="zh_CN">
@@ -35,13 +35,13 @@
 <meta property="og:image" content="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20210614220605.png">
 <meta property="og:image" content="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20210614224731.png">
 <meta property="article:published_time" content="2021-06-13T16:00:00.000Z">
-<meta property="article:modified_time" content="2021-06-14T16:04:36.576Z">
+<meta property="article:modified_time" content="2021-07-07T02:43:46.721Z">
 <meta property="article:author" content="Ever">
 <meta property="article:tag" content="并发编程">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:image" content="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20210529230500.png">
   <!-- Canonical links -->
-  <link rel="canonical" href="https://tj-ever.github.io/2021/06/14/%E5%B9%B6%E5%8F%91%E7%BC%96%E7%A8%8B%E4%B8%AD%E7%9A%84JMM%E6%A8%A1%E5%9E%8B%E5%92%8Cvolatile%E5%85%B3%E9%94%AE%E5%AD%97/index.html">
+  <link rel="canonical" href="https://tj-ever.github.io/2021/06/14/%E5%B9%B6%E5%8F%91%E7%BC%96%E7%A8%8B%20JMM%E6%A8%A1%E5%9E%8B%E5%92%8Cvolatile/index.html">
   
     <link rel="alternate" href="/atom.xml" title="Ever的个人博客" type="application/atom+xml">
   
@@ -224,7 +224,7 @@
   <div class="widget">
     <h3 class="widget-title">标签</h3>
     <div class="widget-body">
-      <ul class="tag-list" itemprop="keywords"><li class="tag-list-item"><a class="tag-list-link" href="/tags/docker/" rel="tag">docker</a><span class="tag-list-count">3</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/k8s/" rel="tag">k8s</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/linux/" rel="tag">linux</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/oracle/" rel="tag">oracle</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/rabbitmq/" rel="tag">rabbitmq</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/redis/" rel="tag">redis</a><span class="tag-list-count">3</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/sql/" rel="tag">sql</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E5%89%8D%E7%AB%AF/" rel="tag">前端</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E5%B9%B6%E5%8F%91%E7%BC%96%E7%A8%8B/" rel="tag">并发编程</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E7%8E%AF%E5%A2%83%E6%90%AD%E5%BB%BA/" rel="tag">环境搭建</a><span class="tag-list-count">1</span></li></ul>
+      <ul class="tag-list" itemprop="keywords"><li class="tag-list-item"><a class="tag-list-link" href="/tags/docker/" rel="tag">docker</a><span class="tag-list-count">3</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/k8s/" rel="tag">k8s</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/linux/" rel="tag">linux</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/oracle/" rel="tag">oracle</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/rabbitmq/" rel="tag">rabbitmq</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/redis/" rel="tag">redis</a><span class="tag-list-count">3</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/sql/" rel="tag">sql</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E5%89%8D%E7%AB%AF/" rel="tag">前端</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E5%B9%B6%E5%8F%91%E7%BC%96%E7%A8%8B/" rel="tag">并发编程</a><span class="tag-list-count">3</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E7%8E%AF%E5%A2%83%E6%90%AD%E5%BB%BA/" rel="tag">环境搭建</a><span class="tag-list-count">1</span></li></ul>
     </div>
   </div>
 
@@ -234,7 +234,7 @@
   <div class="widget">
     <h3 class="widget-title">标签云</h3>
     <div class="widget-body tagcloud">
-      <a href="/tags/docker/" style="font-size: 14px;">docker</a> <a href="/tags/k8s/" style="font-size: 13px;">k8s</a> <a href="/tags/linux/" style="font-size: 13px;">linux</a> <a href="/tags/oracle/" style="font-size: 13px;">oracle</a> <a href="/tags/rabbitmq/" style="font-size: 13.5px;">rabbitmq</a> <a href="/tags/redis/" style="font-size: 14px;">redis</a> <a href="/tags/sql/" style="font-size: 13px;">sql</a> <a href="/tags/%E5%89%8D%E7%AB%AF/" style="font-size: 13px;">前端</a> <a href="/tags/%E5%B9%B6%E5%8F%91%E7%BC%96%E7%A8%8B/" style="font-size: 13.5px;">并发编程</a> <a href="/tags/%E7%8E%AF%E5%A2%83%E6%90%AD%E5%BB%BA/" style="font-size: 13px;">环境搭建</a>
+      <a href="/tags/docker/" style="font-size: 14px;">docker</a> <a href="/tags/k8s/" style="font-size: 13px;">k8s</a> <a href="/tags/linux/" style="font-size: 13px;">linux</a> <a href="/tags/oracle/" style="font-size: 13px;">oracle</a> <a href="/tags/rabbitmq/" style="font-size: 13.5px;">rabbitmq</a> <a href="/tags/redis/" style="font-size: 14px;">redis</a> <a href="/tags/sql/" style="font-size: 13px;">sql</a> <a href="/tags/%E5%89%8D%E7%AB%AF/" style="font-size: 13px;">前端</a> <a href="/tags/%E5%B9%B6%E5%8F%91%E7%BC%96%E7%A8%8B/" style="font-size: 14px;">并发编程</a> <a href="/tags/%E7%8E%AF%E5%A2%83%E6%90%AD%E5%BB%BA/" style="font-size: 13px;">环境搭建</a>
     </div>
   </div>
 
@@ -243,7 +243,7 @@
   <div class="widget">
     <h3 class="widget-title">归档</h3>
     <div class="widget-body">
-      <ul class="archive-list"><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/06/">六月 2021</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/12/">十二月 2020</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/11/">十一月 2020</a><span class="archive-list-count">7</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/10/">十月 2020</a><span class="archive-list-count">6</span></li></ul>
+      <ul class="archive-list"><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/06/">六月 2021</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/12/">十二月 2020</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/11/">十一月 2020</a><span class="archive-list-count">7</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/10/">十月 2020</a><span class="archive-list-count">6</span></li></ul>
     </div>
   </div>
 
@@ -262,7 +262,22 @@
                 
               </p>
               <p class="item-title">
-                <a href="/2021/06/14/%E5%B9%B6%E5%8F%91%E7%BC%96%E7%A8%8B%E4%B8%AD%E7%9A%84JMM%E6%A8%A1%E5%9E%8B%E5%92%8Cvolatile%E5%85%B3%E9%94%AE%E5%AD%97/" class="title">并发编程中的JMM模型和volatile关键字</a>
+                <a href="/2021/06/17/%E5%B9%B6%E5%8F%91%E7%BC%96%E7%A8%8B%20synchronized&Lock&AQS/" class="title">并发编程 Synchronized&amp;Lock&amp;AQS</a>
+              </p>
+              <p class="item-date">
+                <time datetime="2021-06-16T16:00:00.000Z" itemprop="datePublished">2021-06-17</time>
+              </p>
+            </div>
+          </li>
+          
+          <li>
+            
+            <div class="item-inner">
+              <p class="item-category">
+                
+              </p>
+              <p class="item-title">
+                <a href="/2021/06/14/%E5%B9%B6%E5%8F%91%E7%BC%96%E7%A8%8B%20JMM%E6%A8%A1%E5%9E%8B%E5%92%8Cvolatile/" class="title">并发编程 JMM模型和volatile</a>
               </p>
               <p class="item-date">
                 <time datetime="2021-06-13T16:00:00.000Z" itemprop="datePublished">2021-06-14</time>
@@ -315,21 +330,6 @@
             </div>
           </li>
           
-          <li>
-            
-            <div class="item-inner">
-              <p class="item-category">
-                
-              </p>
-              <p class="item-title">
-                <a href="/2020/11/14/Docker%E6%90%AD%E5%BB%BAOracle/" class="title">Docker安装Oracle数据库</a>
-              </p>
-              <p class="item-date">
-                <time datetime="2020-11-13T16:00:00.000Z" itemprop="datePublished">2020-11-14</time>
-              </p>
-            </div>
-          </li>
-          
       </ul>
     </div>
   </div>
@@ -343,14 +343,14 @@
   
 <main class="main" role="main">
   <div class="content">
-  <article id="post-并发编程中的JMM模型和volatile关键字" class="article article-type-post" itemscope itemtype="http://schema.org/BlogPosting">
+  <article id="post-并发编程 JMM模型和volatile" class="article article-type-post" itemscope itemtype="http://schema.org/BlogPosting">
     
     <div class="article-header">
       
         
   
     <h1 class="article-title" itemprop="name">
-      并发编程中的JMM模型和volatile关键字
+      并发编程 JMM模型和volatile
     </h1>
   
 
@@ -358,7 +358,7 @@
       <div class="article-meta">
         <span class="article-date">
     <i class="icon icon-calendar-check"></i>
-	<a href="/2021/06/14/%E5%B9%B6%E5%8F%91%E7%BC%96%E7%A8%8B%E4%B8%AD%E7%9A%84JMM%E6%A8%A1%E5%9E%8B%E5%92%8Cvolatile%E5%85%B3%E9%94%AE%E5%AD%97/" class="article-date">
+	<a href="/2021/06/14/%E5%B9%B6%E5%8F%91%E7%BC%96%E7%A8%8B%20JMM%E6%A8%A1%E5%9E%8B%E5%92%8Cvolatile/" class="article-date">
 	  <time datetime="2021-06-13T16:00:00.000Z" itemprop="datePublished">2021-06-14</time>
 	</a>
 </span>
@@ -372,7 +372,7 @@
 
         
 
-        <span class="post-comment"><i class="icon icon-comment"></i> <a href="/2021/06/14/%E5%B9%B6%E5%8F%91%E7%BC%96%E7%A8%8B%E4%B8%AD%E7%9A%84JMM%E6%A8%A1%E5%9E%8B%E5%92%8Cvolatile%E5%85%B3%E9%94%AE%E5%AD%97/#comments" class="article-comment-link">评论</a></span>
+        <span class="post-comment"><i class="icon icon-comment"></i> <a href="/2021/06/14/%E5%B9%B6%E5%8F%91%E7%BC%96%E7%A8%8B%20JMM%E6%A8%A1%E5%9E%8B%E5%92%8Cvolatile/#comments" class="article-comment-link">评论</a></span>
         
       </div>
     </div>
@@ -523,7 +523,7 @@
     
     <li class="post-copyright-link hidden-xs">
       <strong>本文链接：</strong>
-      <a href="https://tj-ever.github.io/2021/06/14/%E5%B9%B6%E5%8F%91%E7%BC%96%E7%A8%8B%E4%B8%AD%E7%9A%84JMM%E6%A8%A1%E5%9E%8B%E5%92%8Cvolatile%E5%85%B3%E9%94%AE%E5%AD%97/" title="并发编程中的JMM模型和volatile关键字" target="_blank" rel="external">https://tj-ever.github.io/2021/06/14/并发编程中的JMM模型和volatile关键字/</a>
+      <a href="https://tj-ever.github.io/2021/06/14/%E5%B9%B6%E5%8F%91%E7%BC%96%E7%A8%8B%20JMM%E6%A8%A1%E5%9E%8B%E5%92%8Cvolatile/" title="并发编程 JMM模型和volatile" target="_blank" rel="external">https://tj-ever.github.io/2021/06/14/并发编程 JMM模型和volatile/</a>
     </li>
     
     <li class="post-copyright-license">
@@ -568,6 +568,10 @@
   <div class="bar-inner">
   
   <ul class="pager pull-left">
+    
+    <li class="prev">
+      <a href="/2021/06/17/%E5%B9%B6%E5%8F%91%E7%BC%96%E7%A8%8B%20synchronized&Lock&AQS/" title="并发编程 Synchronized&amp;Lock&amp;AQS"><i class="icon icon-angle-left" aria-hidden="true"></i><span>&nbsp;&nbsp;上一篇</span></a>
+    </li>
     
     
     <li class="next">

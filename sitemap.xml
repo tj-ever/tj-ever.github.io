@@ -2,6 +2,20 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   
   <url>
+    <loc>https://tj-ever.github.io/2021/06/17/%E5%B9%B6%E5%8F%91%E7%BC%96%E7%A8%8B%20synchronized&Lock&AQS/</loc>
+    
+    <lastmod>2021-07-07</lastmod>
+    
+  </url>
+  
+  <url>
+    <loc>https://tj-ever.github.io/2021/06/14/%E5%B9%B6%E5%8F%91%E7%BC%96%E7%A8%8B%20JMM%E6%A8%A1%E5%9E%8B%E5%92%8Cvolatile/</loc>
+    
+    <lastmod>2021-07-07</lastmod>
+    
+  </url>
+  
+  <url>
     <loc>https://tj-ever.github.io/2020/11/14/%E6%AD%BB%E9%94%81%E6%9F%A5%E8%AF%A2/</loc>
     
     <lastmod>2021-06-14</lastmod>
@@ -17,13 +31,6 @@
   
   <url>
     <loc>https://tj-ever.github.io/2020/11/14/Docker%E6%90%AD%E5%BB%BAOracle/</loc>
-    
-    <lastmod>2021-06-14</lastmod>
-    
-  </url>
-  
-  <url>
-    <loc>https://tj-ever.github.io/2021/06/14/%E5%B9%B6%E5%8F%91%E7%BC%96%E7%A8%8B%E4%B8%AD%E7%9A%84JMM%E6%A8%A1%E5%9E%8B%E5%92%8Cvolatile%E5%85%B3%E9%94%AE%E5%AD%97/</loc>
     
     <lastmod>2021-06-14</lastmod>
     
@@ -109,7 +116,7 @@
 
   <url>
     <loc>https://tj-ever.github.io/</loc>
-    <lastmod>2021-06-14</lastmod>
+    <lastmod>2021-07-07</lastmod>
     <changefreq>daily</changefreq>
     <priority>1.0</priority>
   </url>
@@ -117,70 +124,70 @@
   
   <url>
     <loc>https://tj-ever.github.io/tags/linux/</loc>
-    <lastmod>2021-06-14</lastmod>
+    <lastmod>2021-07-07</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.6</priority>
   </url>
   
   <url>
     <loc>https://tj-ever.github.io/tags/docker/</loc>
-    <lastmod>2021-06-14</lastmod>
+    <lastmod>2021-07-07</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.6</priority>
   </url>
   
   <url>
     <loc>https://tj-ever.github.io/tags/oracle/</loc>
-    <lastmod>2021-06-14</lastmod>
+    <lastmod>2021-07-07</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.6</priority>
   </url>
   
   <url>
     <loc>https://tj-ever.github.io/tags/sql/</loc>
-    <lastmod>2021-06-14</lastmod>
+    <lastmod>2021-07-07</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.6</priority>
   </url>
   
   <url>
     <loc>https://tj-ever.github.io/tags/redis/</loc>
-    <lastmod>2021-06-14</lastmod>
+    <lastmod>2021-07-07</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.6</priority>
   </url>
   
   <url>
     <loc>https://tj-ever.github.io/tags/rabbitmq/</loc>
-    <lastmod>2021-06-14</lastmod>
+    <lastmod>2021-07-07</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.6</priority>
   </url>
   
   <url>
     <loc>https://tj-ever.github.io/tags/%E7%8E%AF%E5%A2%83%E6%90%AD%E5%BB%BA/</loc>
-    <lastmod>2021-06-14</lastmod>
+    <lastmod>2021-07-07</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.6</priority>
   </url>
   
   <url>
     <loc>https://tj-ever.github.io/tags/%E5%B9%B6%E5%8F%91%E7%BC%96%E7%A8%8B/</loc>
-    <lastmod>2021-06-14</lastmod>
+    <lastmod>2021-07-07</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.6</priority>
   </url>
   
   <url>
     <loc>https://tj-ever.github.io/tags/%E5%89%8D%E7%AB%AF/</loc>
-    <lastmod>2021-06-14</lastmod>
+    <lastmod>2021-07-07</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.6</priority>
   </url>
   
   <url>
     <loc>https://tj-ever.github.io/tags/k8s/</loc>
-    <lastmod>2021-06-14</lastmod>
+    <lastmod>2021-07-07</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.6</priority>
   </url>
