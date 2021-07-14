@@ -21,7 +21,7 @@
   <meta name="description" content="Semaphore 使用及原理Semaphore 通常我们叫它信号量， 可以用来控制同时访问特定资源的线程数量，通过协调各个线程，以保证合理的使用资源。 可以把它简单的理解成我们停车场入口立着的那个显示屏，每有一辆车进入停车场显示屏就会显示剩余车位减1，每有一辆车从停车场出去，显示屏上显示的剩余车辆就会加1，当显示屏上的剩余车位为0时，停车场入口的栏杆就不会再打开，车辆就无法进入停车场了，直到有一">
 <meta property="og:type" content="article">
 <meta property="og:title" content="并发编程 Tools&amp;CountDownLatch&amp;Semaphore">
-<meta property="og:url" content="https://tj-ever.github.io/2021/07/07/%E5%B9%B6%E5%8F%91%E7%BC%96%E7%A8%8B%20Tools&CountDownLatch&Semaphore/index.html">
+<meta property="og:url" content="https://tj-ever.github.io/2021/07/07/%E5%B9%B6%E5%8F%91%E7%BC%96%E7%A8%8B%20CountDownLatch&Semaphore/index.html">
 <meta property="og:site_name" content="Ever的个人博客">
 <meta property="og:description" content="Semaphore 使用及原理Semaphore 通常我们叫它信号量， 可以用来控制同时访问特定资源的线程数量，通过协调各个线程，以保证合理的使用资源。 可以把它简单的理解成我们停车场入口立着的那个显示屏，每有一辆车进入停车场显示屏就会显示剩余车位减1，每有一辆车从停车场出去，显示屏上显示的剩余车辆就会加1，当显示屏上的剩余车位为0时，停车场入口的栏杆就不会再打开，车辆就无法进入停车场了，直到有一">
 <meta property="og:locale" content="zh_CN">
@@ -35,7 +35,7 @@
 <meta name="twitter:card" content="summary">
 <meta name="twitter:image" content="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20210707114753.png">
   <!-- Canonical links -->
-  <link rel="canonical" href="https://tj-ever.github.io/2021/07/07/%E5%B9%B6%E5%8F%91%E7%BC%96%E7%A8%8B%20Tools&CountDownLatch&Semaphore/index.html">
+  <link rel="canonical" href="https://tj-ever.github.io/2021/07/07/%E5%B9%B6%E5%8F%91%E7%BC%96%E7%A8%8B%20CountDownLatch&Semaphore/index.html">
   
     <link rel="alternate" href="/atom.xml" title="Ever的个人博客" type="application/atom+xml">
   
@@ -218,7 +218,7 @@
   <div class="widget">
     <h3 class="widget-title">标签</h3>
     <div class="widget-body">
-      <ul class="tag-list" itemprop="keywords"><li class="tag-list-item"><a class="tag-list-link" href="/tags/docker/" rel="tag">docker</a><span class="tag-list-count">3</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/k8s/" rel="tag">k8s</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/linux/" rel="tag">linux</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/oracle/" rel="tag">oracle</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/rabbitmq/" rel="tag">rabbitmq</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/redis/" rel="tag">redis</a><span class="tag-list-count">3</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/sql/" rel="tag">sql</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E5%89%8D%E7%AB%AF/" rel="tag">前端</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E5%B9%B6%E5%8F%91%E7%BC%96%E7%A8%8B/" rel="tag">并发编程</a><span class="tag-list-count">4</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E7%8E%AF%E5%A2%83%E6%90%AD%E5%BB%BA/" rel="tag">环境搭建</a><span class="tag-list-count">1</span></li></ul>
+      <ul class="tag-list" itemprop="keywords"><li class="tag-list-item"><a class="tag-list-link" href="/tags/docker/" rel="tag">docker</a><span class="tag-list-count">3</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/k8s/" rel="tag">k8s</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/linux/" rel="tag">linux</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/oracle/" rel="tag">oracle</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/rabbitmq/" rel="tag">rabbitmq</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/redis/" rel="tag">redis</a><span class="tag-list-count">3</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/sql/" rel="tag">sql</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E5%89%8D%E7%AB%AF/" rel="tag">前端</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E5%B9%B6%E5%8F%91%E7%BC%96%E7%A8%8B/" rel="tag">并发编程</a><span class="tag-list-count">6</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E7%8E%AF%E5%A2%83%E6%90%AD%E5%BB%BA/" rel="tag">环境搭建</a><span class="tag-list-count">1</span></li></ul>
     </div>
   </div>
 
@@ -237,7 +237,7 @@
   <div class="widget">
     <h3 class="widget-title">归档</h3>
     <div class="widget-body">
-      <ul class="archive-list"><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/07/">七月 2021</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/06/">六月 2021</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/12/">十二月 2020</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/11/">十一月 2020</a><span class="archive-list-count">7</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/10/">十月 2020</a><span class="archive-list-count">6</span></li></ul>
+      <ul class="archive-list"><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/07/">七月 2021</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/06/">六月 2021</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/12/">十二月 2020</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/11/">十一月 2020</a><span class="archive-list-count">7</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/10/">十月 2020</a><span class="archive-list-count">6</span></li></ul>
     </div>
   </div>
 
@@ -256,7 +256,37 @@
                 
               </p>
               <p class="item-title">
-                <a href="/2021/07/07/%E5%B9%B6%E5%8F%91%E7%BC%96%E7%A8%8B%20Tools&CountDownLatch&Semaphore/" class="title">并发编程 Tools&amp;CountDownLatch&amp;Semaphore</a>
+                <a href="/2021/07/13/%E5%B9%B6%E5%8F%91%E7%BC%96%E7%A8%8B%20%E9%98%BB%E5%A1%9E%E9%98%9F%E5%88%97BlockingQueue/" class="title">并发编程 BlockingQueue</a>
+              </p>
+              <p class="item-date">
+                <time datetime="2021-07-12T16:00:00.000Z" itemprop="datePublished">2021-07-13</time>
+              </p>
+            </div>
+          </li>
+          
+          <li>
+            
+            <div class="item-inner">
+              <p class="item-category">
+                
+              </p>
+              <p class="item-title">
+                <a href="/2021/07/12/%E5%B9%B6%E5%8F%91%E7%BC%96%E7%A8%8B%20Reentrantlock/" class="title">并发编程 ReentrantLock</a>
+              </p>
+              <p class="item-date">
+                <time datetime="2021-07-11T16:00:00.000Z" itemprop="datePublished">2021-07-12</time>
+              </p>
+            </div>
+          </li>
+          
+          <li>
+            
+            <div class="item-inner">
+              <p class="item-category">
+                
+              </p>
+              <p class="item-title">
+                <a href="/2021/07/07/%E5%B9%B6%E5%8F%91%E7%BC%96%E7%A8%8B%20CountDownLatch&Semaphore/" class="title">并发编程 Tools&amp;CountDownLatch&amp;Semaphore</a>
               </p>
               <p class="item-date">
                 <time datetime="2021-07-06T16:00:00.000Z" itemprop="datePublished">2021-07-07</time>
@@ -294,36 +324,6 @@
             </div>
           </li>
           
-          <li>
-            
-            <div class="item-inner">
-              <p class="item-category">
-                
-              </p>
-              <p class="item-title">
-                <a href="/2020/12/02/Docker%E5%AE%B9%E5%99%A8%E8%BF%81%E7%A7%BB%EF%BC%8C%E5%A4%87%E4%BB%BD/" class="title">docker容器迁移，备份</a>
-              </p>
-              <p class="item-date">
-                <time datetime="2020-12-01T16:00:00.000Z" itemprop="datePublished">2020-12-02</time>
-              </p>
-            </div>
-          </li>
-          
-          <li>
-            
-            <div class="item-inner">
-              <p class="item-category">
-                
-              </p>
-              <p class="item-title">
-                <a href="/2020/11/20/Rabbitmq%E5%AE%9E%E7%8E%B0%E6%B6%88%E6%81%AF%E5%8F%AF%E9%9D%A0%E6%80%A7%E6%8A%95%E9%80%92/" class="title">Rabbitmq实现消息可靠性投递</a>
-              </p>
-              <p class="item-date">
-                <time datetime="2020-11-19T16:00:00.000Z" itemprop="datePublished">2020-11-20</time>
-              </p>
-            </div>
-          </li>
-          
       </ul>
     </div>
   </div>
@@ -337,7 +337,7 @@
   
 <main class="main" role="main">
   <div class="content">
-  <article id="post-并发编程 Tools&amp;CountDownLatch&amp;Semaphore" class="article article-type-post" itemscope itemtype="http://schema.org/BlogPosting">
+  <article id="post-并发编程 CountDownLatch&amp;Semaphore" class="article article-type-post" itemscope itemtype="http://schema.org/BlogPosting">
     
     <div class="article-header">
       
@@ -352,7 +352,7 @@
       <div class="article-meta">
         <span class="article-date">
     <i class="icon icon-calendar-check"></i>
-	<a href="/2021/07/07/%E5%B9%B6%E5%8F%91%E7%BC%96%E7%A8%8B%20Tools&CountDownLatch&Semaphore/" class="article-date">
+	<a href="/2021/07/07/%E5%B9%B6%E5%8F%91%E7%BC%96%E7%A8%8B%20CountDownLatch&Semaphore/" class="article-date">
 	  <time datetime="2021-07-06T16:00:00.000Z" itemprop="datePublished">2021-07-07</time>
 	</a>
 </span>
@@ -366,7 +366,7 @@
 
         
 
-        <span class="post-comment"><i class="icon icon-comment"></i> <a href="/2021/07/07/%E5%B9%B6%E5%8F%91%E7%BC%96%E7%A8%8B%20Tools&CountDownLatch&Semaphore/#comments" class="article-comment-link">评论</a></span>
+        <span class="post-comment"><i class="icon icon-comment"></i> <a href="/2021/07/07/%E5%B9%B6%E5%8F%91%E7%BC%96%E7%A8%8B%20CountDownLatch&Semaphore/#comments" class="article-comment-link">评论</a></span>
         
       </div>
     </div>
@@ -512,7 +512,7 @@
     
     <li class="post-copyright-link hidden-xs">
       <strong>本文链接：</strong>
-      <a href="https://tj-ever.github.io/2021/07/07/%E5%B9%B6%E5%8F%91%E7%BC%96%E7%A8%8B%20Tools&CountDownLatch&Semaphore/" title="并发编程 Tools&amp;CountDownLatch&amp;Semaphore" target="_blank" rel="external">https://tj-ever.github.io/2021/07/07/并发编程 Tools&CountDownLatch&Semaphore/</a>
+      <a href="https://tj-ever.github.io/2021/07/07/%E5%B9%B6%E5%8F%91%E7%BC%96%E7%A8%8B%20CountDownLatch&Semaphore/" title="并发编程 Tools&amp;CountDownLatch&amp;Semaphore" target="_blank" rel="external">https://tj-ever.github.io/2021/07/07/并发编程 CountDownLatch&Semaphore/</a>
     </li>
     
     <li class="post-copyright-license">
@@ -557,6 +557,10 @@
   <div class="bar-inner">
   
   <ul class="pager pull-left">
+    
+    <li class="prev">
+      <a href="/2021/07/12/%E5%B9%B6%E5%8F%91%E7%BC%96%E7%A8%8B%20Reentrantlock/" title="并发编程 ReentrantLock"><i class="icon icon-angle-left" aria-hidden="true"></i><span>&nbsp;&nbsp;上一篇</span></a>
+    </li>
     
     
     <li class="next">

@@ -1,7 +1,15 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
-    <loc>https://tj-ever.github.io/2021/07/07/%E5%B9%B6%E5%8F%91%E7%BC%96%E7%A8%8B%20Tools&CountDownLatch&Semaphore/</loc>
+    <loc>https://tj-ever.github.io/2021/07/13/%E5%B9%B6%E5%8F%91%E7%BC%96%E7%A8%8B%20%E9%98%BB%E5%A1%9E%E9%98%9F%E5%88%97BlockingQueue/</loc>
+    <lastmod>2021-07-14</lastmod>
+  </url>
+  <url>
+    <loc>https://tj-ever.github.io/2021/07/12/%E5%B9%B6%E5%8F%91%E7%BC%96%E7%A8%8B%20Reentrantlock/</loc>
+    <lastmod>2021-07-13</lastmod>
+  </url>
+  <url>
+    <loc>https://tj-ever.github.io/2021/07/07/%E5%B9%B6%E5%8F%91%E7%BC%96%E7%A8%8B%20CountDownLatch&Semaphore/</loc>
     <lastmod>2021-07-10</lastmod>
   </url>
   <url>
