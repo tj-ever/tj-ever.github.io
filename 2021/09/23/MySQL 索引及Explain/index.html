@@ -1,0 +1,994 @@
+<!DOCTYPE html>
+<html lang=zh>
+<head>
+  <meta charset="utf-8">
+  
+  <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no, minimal-ui">
+  <meta name="renderer" content="webkit">
+  <meta http-equiv="Cache-Control" content="no-transform" />
+  <meta http-equiv="Cache-Control" content="no-siteapp" />
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <meta name="format-detection" content="telephone=no,email=no,adress=no">
+  <!-- Color theme for statusbar -->
+  <meta name="theme-color" content="#000000" />
+  <!-- 强制页面在当前窗口以独立页面显示,防止别人在框架里调用页面 -->
+  <meta http-equiv="window-target" content="_top" />
+  
+  
+  <title>MySQL 索引和Explain执行计划 | Ever的个人博客</title>
+  <meta name="description" content="索引索引是帮助MySQL高效获取数据的排好序的数据结构 索引数据结构  二叉树  红黑树  Hash表  B-Tree     B-Tree 叶节点具有相同的深度，叶节点的指针为空 所有索引元素不重复 节点中的数据索引从左到右递增排列    B+Tree(B-Tree变种)非叶子节点不存储data，只存储索引(冗余)，可以放更多的索引 叶子节点包含所有索引字段 叶子节点用指针连接，提高区间访问的性">
+<meta property="og:type" content="article">
+<meta property="og:title" content="MySQL 索引和Explain执行计划">
+<meta property="og:url" content="https://tj-ever.github.io/2021/09/23/MySQL%20%E7%B4%A2%E5%BC%95%E5%8F%8AExplain/index.html">
+<meta property="og:site_name" content="Ever的个人博客">
+<meta property="og:description" content="索引索引是帮助MySQL高效获取数据的排好序的数据结构 索引数据结构  二叉树  红黑树  Hash表  B-Tree     B-Tree 叶节点具有相同的深度，叶节点的指针为空 所有索引元素不重复 节点中的数据索引从左到右递增排列    B+Tree(B-Tree变种)非叶子节点不存储data，只存储索引(冗余)，可以放更多的索引 叶子节点包含所有索引字段 叶子节点用指针连接，提高区间访问的性">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20210928094512.png">
+<meta property="og:image" content="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20210928094606.png">
+<meta property="og:image" content="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20210928094740.png">
+<meta property="og:image" content="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20210928095050.png">
+<meta property="og:image" content="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20210928095216.png">
+<meta property="og:image" content="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20210928095824.png">
+<meta property="og:image" content="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20210928095837.png">
+<meta property="og:image" content="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20210928100015.png">
+<meta property="og:image" content="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20210928112637.png">
+<meta property="og:image" content="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20210928112700.png">
+<meta property="og:image" content="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20210928112717.png">
+<meta property="og:image" content="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20210928113044.png">
+<meta property="og:image" content="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20210928124506.png">
+<meta property="og:image" content="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20210928124548.png">
+<meta property="og:image" content="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20210928125237.png">
+<meta property="og:image" content="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20210928140157.png">
+<meta property="og:image" content="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20210928141227.png">
+<meta property="og:image" content="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20210928141826.png">
+<meta property="og:image" content="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20210928142018.png">
+<meta property="og:image" content="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20210928142302.png">
+<meta property="og:image" content="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20210928142612.png">
+<meta property="og:image" content="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20210928142728.png">
+<meta property="og:image" content="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20210928143434.png">
+<meta property="og:image" content="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20210928143700.png">
+<meta property="og:image" content="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20210928143756.png">
+<meta property="og:image" content="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20210928143828.png">
+<meta property="og:image" content="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20210928153746.png">
+<meta property="og:image" content="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20210929111543.png">
+<meta property="og:image" content="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20210929133723.png">
+<meta property="og:image" content="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20210929133804.png">
+<meta property="og:image" content="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20210929133924.png">
+<meta property="og:image" content="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20210929134042.png">
+<meta property="og:image" content="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20210929134238.png">
+<meta property="og:image" content="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20210929134359.png">
+<meta property="og:image" content="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20210929134609.png">
+<meta property="og:image" content="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20210929135233.png">
+<meta property="og:image" content="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20210929135302.png">
+<meta property="og:image" content="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20210929135346.png">
+<meta property="og:image" content="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20210929135723.png">
+<meta property="og:image" content="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20210929135750.png">
+<meta property="og:image" content="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20210929135841.png">
+<meta property="og:image" content="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20210929141145.png">
+<meta property="og:image" content="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20210929141214.png">
+<meta property="og:image" content="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20210929141832.png">
+<meta property="og:image" content="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20210929142009.png">
+<meta property="og:image" content="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20210929142200.png">
+<meta property="og:image" content="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20210929155323.png">
+<meta property="og:image" content="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20210929155401.png">
+<meta property="og:image" content="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20210929155541.png">
+<meta property="og:image" content="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20210929155724.png">
+<meta property="og:image" content="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20210929155920.png">
+<meta property="og:image" content="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20210929160011.png">
+<meta property="og:image" content="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20210929160152.png">
+<meta property="og:image" content="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20210929160328.png">
+<meta property="og:image" content="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20210929160445.png">
+<meta property="og:image" content="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20210929161120.png">
+<meta property="og:image" content="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20210929161548.png">
+<meta property="og:image" content="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20210929161907.png">
+<meta property="og:image" content="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20210929162046.png">
+<meta property="og:image" content="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20210929162215.png">
+<meta property="og:image" content="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20210929162252.png">
+<meta property="og:image" content="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20210929162324.png">
+<meta property="article:published_time" content="2021-09-22T16:00:00.000Z">
+<meta property="article:modified_time" content="2021-10-04T14:01:09.971Z">
+<meta property="article:author" content="Ever">
+<meta property="article:tag" content="MySQL">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20210928094512.png">
+  <!-- Canonical links -->
+  <link rel="canonical" href="https://tj-ever.github.io/2021/09/23/MySQL%20%E7%B4%A2%E5%BC%95%E5%8F%8AExplain/index.html">
+  
+    <link rel="alternate" href="/atom.xml" title="Ever的个人博客" type="application/atom+xml">
+  
+  
+    <link rel="icon" href="/favicon.png" type="image/x-icon">
+  
+  
+<link rel="stylesheet" href="/css/style.css">
+
+  
+  
+  
+  
+<meta name="generator" content="Hexo 5.2.0"></head>
+
+
+<body class="main-center" itemscope itemtype="http://schema.org/WebPage">
+  <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+  <div class="slimContent">
+    <div class="navbar-header">
+      
+      
+      <div class="profile-block text-center">
+        <a id="avatar" href="https://github.com/cofess" target="_blank">
+          <img class="img-circle img-rotate" src="/images/avatar.jpg" width="200" height="200">
+        </a>
+        <h2 id="name" class="hidden-xs hidden-sm">Ever</h2>
+        <h3 id="title" class="hidden-xs hidden-sm hidden-md">Ever的个人博客</h3>
+        <small id="location" class="text-muted hidden-xs hidden-sm"><i class="icon icon-map-marker"></i> Xian, China</small>
+      </div>
+      
+      <div class="search" id="search-form-wrap">
+
+    <form class="search-form sidebar-form">
+        <div class="input-group">
+            <input type="text" class="search-form-input form-control" placeholder="搜索" />
+            <span class="input-group-btn">
+                <button type="submit" class="search-form-submit btn btn-flat" onclick="return false;"><i class="icon icon-search"></i></button>
+            </span>
+        </div>
+    </form>
+    <div class="ins-search">
+  <div class="ins-search-mask"></div>
+  <div class="ins-search-container">
+    <div class="ins-input-wrapper">
+      <input type="text" class="ins-search-input" placeholder="想要查找什么..." x-webkit-speech />
+      <button type="button" class="close ins-close ins-selectable" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">×</span></button>
+    </div>
+    <div class="ins-section-wrapper">
+      <div class="ins-section-container"></div>
+    </div>
+  </div>
+</div>
+
+
+</div>
+      <button class="navbar-toggle collapsed" type="button" data-toggle="collapse" data-target="#main-navbar" aria-controls="main-navbar" aria-expanded="false">
+        <span class="sr-only">Toggle navigation</span>
+        <span class="icon-bar"></span>
+        <span class="icon-bar"></span>
+        <span class="icon-bar"></span>
+      </button>
+    </div>
+    <nav id="main-navbar" class="collapse navbar-collapse" itemscope itemtype="http://schema.org/SiteNavigationElement" role="navigation">
+      <ul class="nav navbar-nav main-nav ">
+        
+        
+        <li class="menu-item menu-item-home">
+          <a href="/.">
+            
+            <i class="icon icon-home-fill"></i>
+            
+            <span class="menu-title">首页</span>
+          </a>
+        </li>
+        
+        
+        <li class="menu-item menu-item-archives">
+          <a href="/archives">
+            
+            <i class="icon icon-archives-fill"></i>
+            
+            <span class="menu-title">归档</span>
+          </a>
+        </li>
+        
+        
+        <li class="menu-item menu-item-categories">
+          <a href="/categories">
+            
+            <i class="icon icon-folder"></i>
+            
+            <span class="menu-title">分类</span>
+          </a>
+        </li>
+        
+        
+        <li class="menu-item menu-item-tags">
+          <a href="/tags">
+            
+            <i class="icon icon-tags"></i>
+            
+            <span class="menu-title">标签</span>
+          </a>
+        </li>
+        
+        
+        <li class="menu-item menu-item-repository">
+          <a href="/repository">
+            
+            <i class="icon icon-project"></i>
+            
+            <span class="menu-title">项目</span>
+          </a>
+        </li>
+        
+        
+        <li class="menu-item menu-item-books">
+          <a href="/books">
+            
+            <i class="icon icon-book-fill"></i>
+            
+            <span class="menu-title">书单</span>
+          </a>
+        </li>
+        
+        
+        <li class="menu-item menu-item-links">
+          <a href="/links">
+            
+            <i class="icon icon-friendship"></i>
+            
+            <span class="menu-title">友链</span>
+          </a>
+        </li>
+        
+        
+        <li class="menu-item menu-item-about">
+          <a href="/about">
+            
+            <i class="icon icon-cup-fill"></i>
+            
+            <span class="menu-title">关于</span>
+          </a>
+        </li>
+        
+      </ul>
+      
+	
+    <ul class="social-links">
+    	
+        <li><a href="https://weibo.com/u/2735829887" target="_blank" title="Weibo" data-toggle=tooltip data-placement=top><i class="icon icon-weibo"></i></a></li>
+        
+    </ul>
+
+    </nav>
+  </div>
+</header>
+
+  
+    <aside class="sidebar" itemscope itemtype="http://schema.org/WPSideBar">
+  <div class="slimContent">
+    
+      <div class="widget">
+    <h3 class="widget-title">公告</h3>
+    <div class="widget-body">
+        <div id="board">
+            <div class="content">
+                <p>qq:&nbsp471958719</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+    
+      
+
+    
+      
+  <div class="widget">
+    <h3 class="widget-title">标签</h3>
+    <div class="widget-body">
+      <ul class="tag-list" itemprop="keywords"><li class="tag-list-item"><a class="tag-list-link" href="/tags/JVM/" rel="tag">JVM</a><span class="tag-list-count">4</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/JVM-Arthas/" rel="tag">JVM Arthas</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/MySQL/" rel="tag">MySQL</a><span class="tag-list-count">5</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Zookeeper/" rel="tag">Zookeeper</a><span class="tag-list-count">3</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/docker/" rel="tag">docker</a><span class="tag-list-count">3</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/hashmap/" rel="tag">hashmap</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/k8s/" rel="tag">k8s</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/linux/" rel="tag">linux</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/oracle/" rel="tag">oracle</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/rabbitmq/" rel="tag">rabbitmq</a><span class="tag-list-count">3</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/redis/" rel="tag">redis</a><span class="tag-list-count">3</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/sql/" rel="tag">sql</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E5%89%8D%E7%AB%AF/" rel="tag">前端</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E5%B9%B6%E5%8F%91%E7%BC%96%E7%A8%8B/" rel="tag">并发编程</a><span class="tag-list-count">7</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E7%8E%AF%E5%A2%83%E6%90%AD%E5%BB%BA/" rel="tag">环境搭建</a><span class="tag-list-count">1</span></li></ul>
+    </div>
+  </div>
+
+
+    
+      
+  <div class="widget">
+    <h3 class="widget-title">标签云</h3>
+    <div class="widget-body tagcloud">
+      <a href="/tags/JVM/" style="font-size: 13.5px;">JVM</a> <a href="/tags/JVM-Arthas/" style="font-size: 13px;">JVM Arthas</a> <a href="/tags/MySQL/" style="font-size: 13.75px;">MySQL</a> <a href="/tags/Zookeeper/" style="font-size: 13.25px;">Zookeeper</a> <a href="/tags/docker/" style="font-size: 13.25px;">docker</a> <a href="/tags/hashmap/" style="font-size: 13px;">hashmap</a> <a href="/tags/k8s/" style="font-size: 13px;">k8s</a> <a href="/tags/linux/" style="font-size: 13px;">linux</a> <a href="/tags/oracle/" style="font-size: 13px;">oracle</a> <a href="/tags/rabbitmq/" style="font-size: 13.25px;">rabbitmq</a> <a href="/tags/redis/" style="font-size: 13.25px;">redis</a> <a href="/tags/sql/" style="font-size: 13px;">sql</a> <a href="/tags/%E5%89%8D%E7%AB%AF/" style="font-size: 13px;">前端</a> <a href="/tags/%E5%B9%B6%E5%8F%91%E7%BC%96%E7%A8%8B/" style="font-size: 14px;">并发编程</a> <a href="/tags/%E7%8E%AF%E5%A2%83%E6%90%AD%E5%BB%BA/" style="font-size: 13px;">环境搭建</a>
+    </div>
+  </div>
+
+    
+      
+  <div class="widget">
+    <h3 class="widget-title">归档</h3>
+    <div class="widget-body">
+      <ul class="archive-list"><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/11/">十一月 2021</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/10/">十月 2021</a><span class="archive-list-count">8</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/09/">九月 2021</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/08/">八月 2021</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/07/">七月 2021</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/06/">六月 2021</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/12/">十二月 2020</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/11/">十一月 2020</a><span class="archive-list-count">6</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/10/">十月 2020</a><span class="archive-list-count">5</span></li></ul>
+    </div>
+  </div>
+
+
+    
+      
+  <div class="widget">
+    <h3 class="widget-title">最新文章</h3>
+    <div class="widget-body">
+      <ul class="recent-post-list list-unstyled no-thumbnail">
+        
+          <li>
+            
+            <div class="item-inner">
+              <p class="item-category">
+                
+              </p>
+              <p class="item-title">
+                <a href="/2021/11/01/Rabbitmq%E5%AE%9E%E7%8E%B0%E6%B6%88%E6%81%AF%E5%8F%AF%E9%9D%A0%E6%80%A7%E6%8A%95%E9%80%92/" class="title">Rabbitmq 消息可靠性投递两种方案</a>
+              </p>
+              <p class="item-date">
+                <time datetime="2021-10-31T16:00:00.000Z" itemprop="datePublished">2021-11-01</time>
+              </p>
+            </div>
+          </li>
+          
+          <li>
+            
+            <div class="item-inner">
+              <p class="item-category">
+                
+              </p>
+              <p class="item-title">
+                <a href="/2021/10/25/Rabbitmq%20%E9%AB%98%E7%BA%A7%E7%89%B9%E6%80%A7%E5%8F%8A%E6%95%B4%E5%90%88springboot/" class="title">Rabbitmq 高级特性及整合springboot</a>
+              </p>
+              <p class="item-date">
+                <time datetime="2021-10-24T16:00:00.000Z" itemprop="datePublished">2021-10-25</time>
+              </p>
+            </div>
+          </li>
+          
+          <li>
+            
+            <div class="item-inner">
+              <p class="item-category">
+                
+              </p>
+              <p class="item-title">
+                <a href="/2021/10/22/Rabbitmq%20%E7%8E%AF%E5%A2%83%E6%90%AD%E5%BB%BA%E5%8F%8A%E5%9F%BA%E6%9C%AC%E4%BD%BF%E7%94%A8/" class="title">Rabbitmq 环境搭建及基本使用</a>
+              </p>
+              <p class="item-date">
+                <time datetime="2021-10-21T16:00:00.000Z" itemprop="datePublished">2021-10-22</time>
+              </p>
+            </div>
+          </li>
+          
+          <li>
+            
+            <div class="item-inner">
+              <p class="item-category">
+                
+              </p>
+              <p class="item-title">
+                <a href="/2021/10/21/zookeeper%20leader/" class="title">Zookeeper 源码构建 阅读</a>
+              </p>
+              <p class="item-date">
+                <time datetime="2021-10-20T16:00:00.000Z" itemprop="datePublished">2021-10-21</time>
+              </p>
+            </div>
+          </li>
+          
+          <li>
+            
+            <div class="item-inner">
+              <p class="item-category">
+                
+              </p>
+              <p class="item-title">
+                <a href="/2021/10/07/Zookeeper%20%E5%AE%A2%E6%88%B7%E7%AB%AF%E4%BD%BF%E7%94%A8%E5%8F%8A%E9%9B%86%E7%BE%A4/" class="title">Zookeeper 客户端使用及集群</a>
+              </p>
+              <p class="item-date">
+                <time datetime="2021-10-06T16:00:00.000Z" itemprop="datePublished">2021-10-07</time>
+              </p>
+            </div>
+          </li>
+          
+      </ul>
+    </div>
+  </div>
+  
+
+    
+  </div>
+</aside>
+
+  
+  
+<main class="main" role="main">
+  <div class="content">
+  <article id="post-MySQL 索引及Explain" class="article article-type-post" itemscope itemtype="http://schema.org/BlogPosting">
+    
+    <div class="article-header">
+      
+        
+  
+    <h1 class="article-title" itemprop="name">
+      MySQL 索引和Explain执行计划
+    </h1>
+  
+
+      
+      <div class="article-meta">
+        <span class="article-date">
+    <i class="icon icon-calendar-check"></i>
+	<a href="/2021/09/23/MySQL%20%E7%B4%A2%E5%BC%95%E5%8F%8AExplain/" class="article-date">
+	  <time datetime="2021-09-22T16:00:00.000Z" itemprop="datePublished">2021-09-23</time>
+	</a>
+</span>
+        
+        
+  <span class="article-tag">
+    <i class="icon icon-tags"></i>
+	<a class="article-tag-link-link" href="/tags/MySQL/" rel="tag">MySQL</a>
+  </span>
+
+
+        
+
+        <span class="post-comment"><i class="icon icon-comment"></i> <a href="/2021/09/23/MySQL%20%E7%B4%A2%E5%BC%95%E5%8F%8AExplain/#comments" class="article-comment-link">评论</a></span>
+        
+      </div>
+    </div>
+    <div class="article-entry marked-body" itemprop="articleBody">
+      
+        <h1 id="索引"><a href="#索引" class="headerlink" title="索引"></a>索引</h1><p>索引是帮助MySQL高效获取数据的排好序的数据结构</p>
+<p>索引数据结构</p>
+<ul>
+<li><p>二叉树</p>
+</li>
+<li><p>红黑树</p>
+</li>
+<li><p>Hash表</p>
+</li>
+<li><p>B-Tree</p>
+</li>
+</ul>
+<img src="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20210928094512.png" alt="image-20210928094512039" style="zoom:50%;" />
+
+<h2 id="B-Tree"><a href="#B-Tree" class="headerlink" title="B-Tree"></a>B-Tree</h2><ul>
+<li>叶节点具有相同的深度，叶节点的指针为空</li>
+<li>所有索引元素不重复</li>
+<li>节点中的数据索引从左到右递增排列</li>
+</ul>
+<img src="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20210928094606.png" alt="image-20210928094606504" style="zoom:50%;" />
+
+<h2 id="B-Tree-B-Tree变种"><a href="#B-Tree-B-Tree变种" class="headerlink" title="B+Tree(B-Tree变种)"></a><strong>B+Tree</strong>(B-Tree变种)</h2><p>非叶子节点不存储data，只存储索引(冗余)，可以放更多的索引</p>
+<p>叶子节点包含所有索引字段</p>
+<p>叶子节点用指针连接，提高区间访问的性能</p>
+<img src="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20210928094740.png" alt="image-20210928094740721" style="zoom:50%;" />
+
+<h2 id="Hash"><a href="#Hash" class="headerlink" title="Hash"></a><strong>Hash</strong></h2><p>对索引的key进行一次hash计算就可以定位出数据存储的位置</p>
+<ul>
+<li>很多时候Hash索引要比B+ 树索引更高效</li>
+<li>仅能满足 “=”，“IN”，不支持范围查询</li>
+<li>hash冲突问题</li>
+</ul>
+<img src="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20210928095050.png" alt="image-20210928095050351" style="zoom:50%;" />
+
+<h2 id="MyISAM索引"><a href="#MyISAM索引" class="headerlink" title="MyISAM索引"></a>MyISAM索引</h2><p>MyISAM索引文件和数据文件是分离的(非聚集)</p>
+<img src="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20210928095216.png" alt="image-20210928095216788" style="zoom:50%;" />
+
+
+
+<h2 id="InnoDB索引"><a href="#InnoDB索引" class="headerlink" title="InnoDB索引"></a>InnoDB索引</h2><p>InnoDB索引实现(聚集)</p>
+<p>表数据文件本身就是按B+Tree组织的一个索引结构文件</p>
+<p>聚集索引-叶节点包含了完整的数据记录</p>
+<p>为什么建议InnoDB表必须建主键，并且推荐使用整型的自增主键？</p>
+<p>为什么非主键索引结构叶子节点存储的是主键值？(一致性和节省存储空间)</p>
+<img src="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20210928095824.png" alt="image-20210928095824938" style="zoom:50%;" />
+
+<img src="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20210928095837.png" alt="image-20210928095837493" style="zoom:50%;" />
+
+<h2 id="联合索引"><a href="#联合索引" class="headerlink" title="联合索引"></a>联合索引</h2><img src="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20210928100015.png" alt="image-20210928100015079" style="zoom:50%;" />
+
+
+
+
+
+<h1 id="Explain执行计划"><a href="#Explain执行计划" class="headerlink" title="Explain执行计划"></a>Explain执行计划</h1><p>使用EXPLAIN关键字可以模拟优化器执行SQL语句，分析你的查询语句或是结构的性能瓶颈</p>
+<p>在 select 语句之前增加 explain 关键字，MySQL 会在查询上设置一个标记，执行查询会返回执行计划的信息，而不是执行这条SQL<br>注意:如果 from 中包含子查询，仍会执行该子查询，将结果放入临时表中</p>
+<h2 id="分析示例"><a href="#分析示例" class="headerlink" title="分析示例"></a>分析示例</h2><p>参考官方文档:<a target="_blank" rel="noopener" href="https://dev.mysql.com/doc/refman/5.7/en/explain-output.html">https://dev.mysql.com/doc/refman/5.7/en/explain-output.html</a></p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">-- 演员表</span></span><br><span class="line"><span class="keyword">DROP</span> <span class="keyword">TABLE</span> <span class="keyword">IF</span> <span class="keyword">EXISTS</span> <span class="string">`actor`</span>;</span><br><span class="line"><span class="keyword">CREATE</span> <span class="keyword">TABLE</span> <span class="string">`actor`</span> (</span><br><span class="line">   <span class="string">`id`</span> <span class="built_in">int</span>(<span class="number">11</span>) <span class="keyword">NOT</span> <span class="literal">NULL</span>,</span><br><span class="line">   <span class="string">`name`</span> <span class="built_in">varchar</span>(<span class="number">45</span>) <span class="keyword">DEFAULT</span> <span class="literal">NULL</span>,</span><br><span class="line">   <span class="string">`update_time`</span> datetime <span class="keyword">DEFAULT</span> <span class="literal">NULL</span>,</span><br><span class="line">   PRIMARY <span class="keyword">KEY</span> (<span class="string">`id`</span>)</span><br><span class="line">  ) <span class="keyword">ENGINE</span>=<span class="keyword">InnoDB</span> <span class="keyword">DEFAULT</span> <span class="keyword">CHARSET</span>=utf8;</span><br><span class="line"><span class="comment">-- 如果日期插不进去 可以执行 SET SESSION sql_mode = &#x27;ALLOW_INVALID_DATES&#x27;;  </span></span><br><span class="line"><span class="keyword">INSERT</span> <span class="keyword">INTO</span> <span class="string">`actor`</span> (<span class="string">`id`</span>, <span class="string">`name`</span>, <span class="string">`update_time`</span>) <span class="keyword">VALUES</span> (<span class="number">1</span>,<span class="string">&#x27;a&#x27;</span>,<span class="string">&#x27;2017‐12‐22 15:27:18&#x27;</span>), (<span class="number">2</span>,<span class="string">&#x27;b&#x27;</span>,<span class="string">&#x27;2017‐12‐22 15:27:18&#x27;</span>), (<span class="number">3</span>,<span class="string">&#x27;c&#x27;</span>,<span class="string">&#x27;2017‐12‐22 15:27:18&#x27;</span>);</span><br><span class="line"></span><br><span class="line"><span class="comment">-- 电影表</span></span><br><span class="line"><span class="keyword">DROP</span> <span class="keyword">TABLE</span> <span class="keyword">IF</span> <span class="keyword">EXISTS</span> <span class="string">`film`</span>;</span><br><span class="line"><span class="keyword">CREATE</span> <span class="keyword">TABLE</span> <span class="string">`film`</span> (</span><br><span class="line"><span class="string">`id`</span> <span class="built_in">int</span>(<span class="number">11</span>) <span class="keyword">NOT</span> <span class="literal">NULL</span> AUTO_INCREMENT,</span><br><span class="line"><span class="string">`name`</span> <span class="built_in">varchar</span>(<span class="number">10</span>) <span class="keyword">DEFAULT</span> <span class="literal">NULL</span>,</span><br><span class="line">PRIMARY <span class="keyword">KEY</span> (<span class="string">`id`</span>),</span><br><span class="line"><span class="keyword">KEY</span> <span class="string">`idx_name`</span> (<span class="string">`name`</span>)</span><br><span class="line">) <span class="keyword">ENGINE</span>=<span class="keyword">InnoDB</span> <span class="keyword">DEFAULT</span> <span class="keyword">CHARSET</span>=utf8;</span><br><span class="line"></span><br><span class="line"><span class="keyword">INSERT</span> <span class="keyword">INTO</span> <span class="string">`film`</span> (<span class="string">`id`</span>, <span class="string">`name`</span>) <span class="keyword">VALUES</span> (<span class="number">1</span>,<span class="string">&#x27;film1&#x27;</span>),(<span class="number">2</span>,<span class="string">&#x27;film2&#x27;</span>),(<span class="number">3</span>,<span class="string">&#x27;film3&#x27;</span>);</span><br><span class="line"></span><br><span class="line"><span class="comment">-- 关联表</span></span><br><span class="line"><span class="keyword">DROP</span> <span class="keyword">TABLE</span> <span class="keyword">IF</span> <span class="keyword">EXISTS</span> <span class="string">`film_actor`</span>;</span><br><span class="line"><span class="keyword">CREATE</span> <span class="keyword">TABLE</span> <span class="string">`film_actor`</span> (</span><br><span class="line"><span class="string">`id`</span> <span class="built_in">int</span>(<span class="number">11</span>) <span class="keyword">NOT</span> <span class="literal">NULL</span>,</span><br><span class="line"><span class="string">`film_id`</span> <span class="built_in">int</span>(<span class="number">11</span>) <span class="keyword">NOT</span> <span class="literal">NULL</span>,</span><br><span class="line"><span class="string">`actor_id`</span> <span class="built_in">int</span>(<span class="number">11</span>) <span class="keyword">NOT</span> <span class="literal">NULL</span>,</span><br><span class="line"><span class="string">`remark`</span> <span class="built_in">varchar</span>(<span class="number">255</span>) <span class="keyword">DEFAULT</span> <span class="literal">NULL</span>,</span><br><span class="line">PRIMARY <span class="keyword">KEY</span> (<span class="string">`id`</span>),</span><br><span class="line"><span class="keyword">KEY</span> <span class="string">`idx_film_actor_id`</span> (<span class="string">`film_id`</span>,<span class="string">`actor_id`</span>)</span><br><span class="line">) <span class="keyword">ENGINE</span>=<span class="keyword">InnoDB</span> <span class="keyword">DEFAULT</span> <span class="keyword">CHARSET</span>=utf8;</span><br><span class="line"></span><br><span class="line"><span class="keyword">INSERT</span> <span class="keyword">INTO</span> <span class="string">`film_actor`</span> (<span class="string">`id`</span>, <span class="string">`film_id`</span>, <span class="string">`actor_id`</span>) <span class="keyword">VALUES</span> (<span class="number">1</span>,<span class="number">1</span>,<span class="number">1</span>),(<span class="number">2</span>,<span class="number">1</span>,<span class="number">2</span>),(<span class="number">3</span>,<span class="number">2</span>,<span class="number">1</span>)</span><br><span class="line"></span><br></pre></td></tr></table></figure>
+
+<p>actor数据</p>
+<img src="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20210928112637.png" alt="image-20210928112637517" style="zoom:50%;" />
+
+<p>film数据</p>
+<img src="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20210928112700.png" alt="image-20210928112700126" style="zoom:50%;" />
+
+<p>film-actor数据</p>
+<img src="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20210928112717.png" alt="image-20210928112717739" style="zoom:50%;" />
+
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">explain</span> <span class="keyword">select</span> * <span class="keyword">from</span> actor;</span><br></pre></td></tr></table></figure>
+
+<p><img src="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20210928113044.png" alt="image-20210928113044526"></p>
+<p>在查询中的每个表会输出一行，如果有两个表通过 join 连接查询，那么会输出两行</p>
+<h2 id="explain-两个变种"><a href="#explain-两个变种" class="headerlink" title="explain 两个变种"></a>explain 两个变种</h2><h3 id="explain-extended"><a href="#explain-extended" class="headerlink" title="explain extended"></a>explain extended</h3><p>会在 explain 的基础上额外提供一些查询优化的信息。紧随其后通过 show warnings 命令可</p>
+<p>以得到优化后的查询语句，从而看出优化器优化了什么。额外还有 filtered 列，是一个半分比的值，rows * filtered/100 可以估算出将要和 explain 中前一个表进行连接的行数(前一个表指 explain 中的id值比当前表id值小的表)。</p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">explain</span> <span class="keyword">extended</span> <span class="keyword">select</span> * <span class="keyword">from</span> film <span class="keyword">where</span> <span class="keyword">id</span> = <span class="number">1</span>;</span><br><span class="line"><span class="keyword">show</span> <span class="keyword">WARNINGS</span>;</span><br></pre></td></tr></table></figure>
+
+<p>explain 结果</p>
+<p><img src="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20210928124506.png" alt="image-20210928124506045"></p>
+<p>show warings 结果</p>
+<p><img src="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20210928124548.png" alt="image-20210928124548843"></p>
+<h3 id="explain-partitions"><a href="#explain-partitions" class="headerlink" title="explain partitions"></a>explain partitions</h3><p>相比 explain 多了个 partitions 字段，如果查询是基于分区表的话，会显示查询将访问的分区。</p>
+<h2 id="explain中的列"><a href="#explain中的列" class="headerlink" title="explain中的列"></a>explain中的列</h2><h3 id="id列"><a href="#id列" class="headerlink" title="id列"></a>id列</h3><p>id列的编号是 select 的序列号，有几个 select 就有几个id，并且id的顺序是按 select 出现的顺序增长的。 id列越大执行优先级越高，id相同则从上往下执行，id为NULL最后执行。</p>
+<h3 id="select-type列"><a href="#select-type列" class="headerlink" title="select_type列"></a>select_type列</h3><p>select_type 表示对应行是简单还是复杂的查询。</p>
+<ol>
+<li><p>simple:简单查询。查询不包含子查询和union</p>
+<img src="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20210928125237.png" alt="image-20210928125237511" style="zoom:50%;" />
+</li>
+<li><p>primary:复杂查询中最外层的 select</p>
+</li>
+<li><p>subquery:包含在 select 中的子查询(不在 from 子句中)</p>
+</li>
+<li><p>derived:包含在 from 子句中的子查询。MySQL会将结果存放在一个临时表中，也称为派生表(derived的英文含义)</p>
+<img src="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20210928140157.png" alt="image-20210928140157075" style="zoom:50%;" />
+</li>
+<li><p>union:在 union 中的第二个和随后的 select</p>
+<img src="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20210928141227.png" alt="image-20210928141227042" style="zoom:50%;" />
+
+</li>
+</ol>
+<h3 id="table列"><a href="#table列" class="headerlink" title="table列"></a>table列</h3><p>这一列表示 explain 的一行正在访问哪个表。<br>当 from 子句中有子查询时，table列是 <derivenN> 格式，表示当前查询依赖 id=N 的查询，于是先执行 id=N 的查 询。<br>当有 union 时，UNION RESULT 的 table 列的值为&lt;union1,2&gt;，1和2表示参与 union 的 select 行id。</p>
+<h3 id="type列"><a href="#type列" class="headerlink" title="type列"></a>type列</h3><p>这一列表示关联类型或访问类型，即MySQL决定如何查找表中的行，查找数据行记录的大概范围。 </p>
+<p>依次从最优到最差分别为:system &gt; const &gt; eq_ref &gt; ref &gt; range &gt; index &gt; ALL </p>
+<p><strong>一般来说，得保证查询达到range级别，最好达到ref</strong></p>
+<ul>
+<li><p>NULL</p>
+<p>mysql能够在优化阶段分解查询语句，在执行阶段用不着再访问表或索引。</p>
+<p>例如:在索引列中选取最小值，可 以单独查找索引来完成，不需要在执行时访问表</p>
+</li>
+</ul>
+<img src="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20210928141826.png" alt="image-20210928141826882" style="zoom:50%;" />
+
+<ul>
+<li><p>const, system</p>
+<p>mysql能对查询的某部分进行优化并将其转化成一个常量(可以看show warnings 的结果)。</p>
+<p>用于 primary key 或 unique key 的所有列与常数比较时，所以表最多有一个匹配行，读取1次，速度比较快。</p>
+<p>system是 const的特例，表里只有一条元组匹配时为system</p>
+<p><img src="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20210928142018.png" style="zoom:50%;" />“</p>
+</li>
+</ul>
+<img src="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20210928142302.png" alt="image-20210928142302451" style="zoom:50%;" />
+
+<ul>
+<li><p>eq_ref</p>
+<p>primary key 或 unique key 索引的所有部分被连接使用 ，最多只会返回一条符合条件的记录。</p>
+<p>这可能是在 const 之外最好的联接类型了，简单的 select 查询不会出现这种 type。</p>
+</li>
+</ul>
+<img src="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20210928142612.png" alt="image-20210928142612879" style="zoom:50%;" />
+
+<ul>
+<li><p>ref</p>
+<p>相比 eq_ref，不使用唯一索引，而是使用普通索引或者唯一性索引的部分前缀，索引要和某个值相比较，可能会找到多个符合条件的行</p>
+<ul>
+<li><p>简单 select 查询，name是普通索引(非唯一索引)</p>
+<img src="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20210928142728.png" alt="image-20210928142728756" style="zoom:50%;" />
+</li>
+<li><p>关联表查询，idx_film_actor_id是film_id和actor_id的联合索引，这里使用到了film_actor的左边前缀film_id部分。</p>
+<img src="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20210928143434.png" alt="image-20210928143434814" style="zoom:50%;" />
+</li>
+</ul>
+</li>
+<li><p>range</p>
+<p>范围扫描通常出现在 in(), between ,&gt; ,&lt;, &gt;= 等操作中。使用一个索引来检索给定范围的行。</p>
+<img src="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20210928143700.png" alt="image-20210928143700192" style="zoom:50%;" />
+</li>
+<li><p>index</p>
+<p>扫描全索引就能拿到结果，一般是扫描某个二级索引，这种扫描不会从索引树根节点开始快速查找，而是直接对二级索引的叶子节点遍历和扫描，速度还是比较慢的，这种查询一般为使用覆盖索引，二级索引一般比较小，所以这种通常比ALL快一些。</p>
+<img src="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20210928143756.png" alt="image-20210928143756335" style="zoom:50%;" />
+</li>
+<li><p>ALL</p>
+<p>即全表扫描，扫描你的聚簇索引的所有叶子节点。通常情况下这需要增加索引来进行优化了。</p>
+<img src="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20210928143828.png" alt="image-20210928143828925" style="zoom:50%;" />
+
+</li>
+</ul>
+<h3 id="possible-keys列"><a href="#possible-keys列" class="headerlink" title="possible_keys列"></a>possible_keys列</h3><p>这一列显示查询可能使用哪些索引来查找。<br>explain 时可能出现 possible_keys 有列，而 key 显示 NULL 的情况，这种情况是因为表中数据不多，mysql认为索引 对此查询帮助不大，选择了全表查询。<br>如果该列是NULL，则没有相关的索引。在这种情况下，可以通过检查 where子句看是否可以创造一个适当的索引来提高查询性能，然后用 explain 查看效果。</p>
+<h3 id="key列"><a href="#key列" class="headerlink" title="key列"></a>key列</h3><p>这一列显示mysql实际采用哪个索引来优化对该表的访问。如果没有使用索引，则该列是 NULL。</p>
+<p>如果想强制mysql使用或忽视possible_keys列中的索引，在查询中使用 force index、ignore index。</p>
+<h3 id="key-len列"><a href="#key-len列" class="headerlink" title="key_len列"></a>key_len列</h3><p>这一列显示了mysql在索引里使用的字节数，通过这个值可以算出具体使用了索引中的哪些列。</p>
+<p>举例来说，film_actor的联合索引 idx_film_actor_id 由 film_id 和 actor_id 两个int列组成，并且每个int是4字节。通过结果中的key_len=4可推断出查询使用了第一个列:film_id列来执行索引查找。</p>
+<img src="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20210928153746.png" alt="image-20210928153746752" style="zoom:50%;" />
+
+
+
+<p>key_len计算规则如下:</p>
+<ul>
+<li><p>字符串</p>
+<ul>
+<li><p>char(n) 和 varchar(n)，5.0.3以后版本中，n均代表字符数，而不是字节数，如果是utf-8，一个数字或字母占1个字节，一个汉字占3个字节 </p>
+</li>
+<li><p>char(n):如果存汉字长度就是 3n 字节</p>
+</li>
+<li><p>varchar(n):如果存汉字则长度是 3n + 2 字节，加的2字节用来存储字符串长度，因为 varchar是变长字符串</p>
+</li>
+</ul>
+</li>
+<li><p>数值类型</p>
+<ul>
+<li>tinyint:1字节</li>
+<li>smallint:2字节</li>
+<li>int:4字节</li>
+<li>bigint:8字节  </li>
+</ul>
+</li>
+<li><p>时间类型</p>
+<ul>
+<li>date:3字节</li>
+<li>timestamp:4字节</li>
+<li>datetime:8字节</li>
+</ul>
+</li>
+<li><p>如果字段允许为 NULL，需要1字节记录是否为 NULL</p>
+</li>
+</ul>
+<p>索引最大长度是768字节，当字符串过长时，mysql会做一个类似左前缀索引的处理，将前半部分的字符提取出来做索引。</p>
+<h3 id="ref列"><a href="#ref列" class="headerlink" title="ref列"></a>ref列</h3><p>这一列显示了在key列记录的索引中，表查找值所用到的列或常量，常见的有:const(常量)，字段名(例:film.id)</p>
+<h3 id="rows列"><a href="#rows列" class="headerlink" title="rows列"></a>rows列</h3><p>这一列是mysql估计要读取并检测的行数，注意这个不是结果集里的行数。</p>
+<h3 id="extra列"><a href="#extra列" class="headerlink" title="extra列"></a>extra列</h3><p>这一列展示的是额外信息。常见的重要值如下:</p>
+<ul>
+<li><p>Using index:使用覆盖索引</p>
+<p><strong>覆盖索引定义</strong>:mysql执行计划explain结果里的key有使用索引，如果select后面查询的字段都可以从这个索引的树中获取，这种情况一般可以说是用到了覆盖索引，extra里一般都有using index;</p>
+<p>覆盖索引一般针对的是辅助索引，整个查询结果只通过辅助索引就能拿到结果，不需要通过辅助索引树找到主键，再通过主键去主键索引树里获取其它字段值</p>
+<img src="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20210929111543.png" alt="image-20210929111542983" style="zoom:50%;" />
+</li>
+<li><p>Using where:使用 where 语句来处理结果，并且查询的列未被索引覆盖</p>
+<img src="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20210929133723.png" alt="image-20210929133723260" style="zoom:50%;" />
+</li>
+<li><p>Using index condition:查询的列不完全被索引覆盖，where条件中是一个前导列的范围;</p>
+<img src="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20210929133804.png" alt="image-20210929133804734" style="zoom:50%;" />
+</li>
+<li><p>Using temporary:mysql需要创建一张临时表来处理查询。出现这种情况一般是要进行优化的，首先是想到用索引来优化。</p>
+<ul>
+<li><p>actor.name没有索引，此时创建了张临时表来distinct</p>
+<img src="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20210929133924.png" alt="image-2021092        9133924451" style="zoom:50%;" />
+
+
+
+</li>
+</ul>
+</li>
+</ul>
+<ul>
+<li><p>film.name建立了idx_name索引，此时查询时extra是using index,没有用临时表</p>
+<img src="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20210929134042.png" alt="image-20210929134042090" style="zoom:50%;" />
+</li>
+<li><p>Using filesort:将用外部排序而不是索引排序，数据较小时从内存排序，否则需要在磁盘完成排序。这种情况下一般也是要考虑使用索引来优化的。</p>
+<ul>
+<li><p>actor.name未创建索引，会浏览actor整个表，保存排序关键字name和对应的id，然后排序name并检索行记录</p>
+<img src="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20210929134238.png" alt="image-20210929134238147" style="zoom:50%;" />
+</li>
+<li><p>film.name建立了idx_name索引,此时查询时extra是using index</p>
+<img src="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20210929134359.png" alt="image-20210929134359907" style="zoom:50%;" />
+</li>
+</ul>
+</li>
+<li><p>Select tables optimized away:使用某些聚合函数(比如 max、min)来访问存在索引的某个字段</p>
+<img src="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20210929134609.png" alt="image-20210929134609629" style="zoom:50%;" />
+
+
+
+</li>
+</ul>
+<h1 id="索引最佳实践"><a href="#索引最佳实践" class="headerlink" title="索引最佳实践"></a>索引最佳实践</h1><figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">CREATE</span> <span class="keyword">TABLE</span> <span class="string">`employees`</span> (</span><br><span class="line">	<span class="string">`id`</span> <span class="built_in">INT</span> ( <span class="number">11</span> ) <span class="keyword">NOT</span> <span class="literal">NULL</span> AUTO_INCREMENT,</span><br><span class="line">	<span class="string">`name`</span> <span class="built_in">VARCHAR</span> ( <span class="number">24</span> ) <span class="keyword">NOT</span> <span class="literal">NULL</span> <span class="keyword">DEFAULT</span> <span class="string">&#x27;&#x27;</span> <span class="keyword">COMMENT</span> <span class="string">&#x27;姓名&#x27;</span>,</span><br><span class="line">	<span class="string">`age`</span> <span class="built_in">INT</span> ( <span class="number">11</span> ) <span class="keyword">NOT</span> <span class="literal">NULL</span> <span class="keyword">DEFAULT</span> <span class="string">&#x27;0&#x27;</span> <span class="keyword">COMMENT</span> <span class="string">&#x27;年龄&#x27;</span>,</span><br><span class="line">	<span class="string">`position`</span> <span class="built_in">VARCHAR</span> ( <span class="number">20</span> ) <span class="keyword">NOT</span> <span class="literal">NULL</span> <span class="keyword">DEFAULT</span> <span class="string">&#x27;&#x27;</span> <span class="keyword">COMMENT</span> <span class="string">&#x27;职位&#x27;</span>,</span><br><span class="line">	<span class="string">`hire_time`</span> <span class="built_in">TIMESTAMP</span> <span class="keyword">NOT</span> <span class="literal">NULL</span> <span class="keyword">DEFAULT</span> <span class="keyword">CURRENT_TIMESTAMP</span> <span class="keyword">COMMENT</span> <span class="string">&#x27;入职时间&#x27;</span>,</span><br><span class="line">	PRIMARY <span class="keyword">KEY</span> ( <span class="string">`id`</span> ),</span><br><span class="line">	<span class="keyword">KEY</span> <span class="string">`idx_name_age_position`</span> ( <span class="string">`name`</span>, <span class="string">`age`</span>, <span class="string">`position`</span> ) <span class="keyword">USING</span> BTREE </span><br><span class="line">) <span class="keyword">ENGINE</span> = <span class="keyword">INNODB</span> AUTO_INCREMENT = <span class="number">4</span> <span class="keyword">DEFAULT</span> <span class="keyword">CHARSET</span> = utf8 <span class="keyword">COMMENT</span> = <span class="string">&#x27;员工记录表&#x27;</span>;</span><br><span class="line"><span class="keyword">INSERT</span> <span class="keyword">INTO</span> employees ( <span class="keyword">NAME</span>, age, <span class="keyword">position</span>, hire_time )</span><br><span class="line"><span class="keyword">VALUES</span></span><br><span class="line">	(</span><br><span class="line">		<span class="string">&#x27;LiLei&#x27;</span>,</span><br><span class="line">		<span class="number">22</span>,</span><br><span class="line">		<span class="string">&#x27;manager&#x27;</span>,</span><br><span class="line">	<span class="keyword">NOW</span>());</span><br><span class="line"><span class="keyword">INSERT</span> <span class="keyword">INTO</span> employees ( <span class="keyword">NAME</span>, age, <span class="keyword">position</span>, hire_time )</span><br><span class="line"><span class="keyword">VALUES</span></span><br><span class="line">	(</span><br><span class="line">		<span class="string">&#x27;HanMeimei&#x27;</span>,</span><br><span class="line">		<span class="number">23</span>,</span><br><span class="line">		<span class="string">&#x27;dev&#x27;</span>,</span><br><span class="line">	<span class="keyword">NOW</span>());</span><br><span class="line"><span class="keyword">INSERT</span> <span class="keyword">INTO</span> employees ( <span class="keyword">NAME</span>, age, <span class="keyword">position</span>, hire_time )</span><br><span class="line"><span class="keyword">VALUES</span></span><br><span class="line">	(</span><br><span class="line">		<span class="string">&#x27;Lucy&#x27;</span>,</span><br><span class="line">		<span class="number">23</span>,</span><br><span class="line">	<span class="string">&#x27;dev&#x27;</span>,</span><br><span class="line">	<span class="keyword">NOW</span>());</span><br></pre></td></tr></table></figure>
+
+
+
+<h2 id="全值匹配"><a href="#全值匹配" class="headerlink" title="全值匹配"></a>全值匹配</h2><img src="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20210929135233.png" alt="image-20210929135233203" style="zoom:50%;" />
+
+<img src="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20210929135302.png" alt="image-20210929135302686" style="zoom:50%;" />
+
+<img src="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20210929135346.png" alt="image-20210929135346079" style="zoom:50%;" />
+
+
+
+<h2 id="最左前缀法则"><a href="#最左前缀法则" class="headerlink" title="最左前缀法则"></a>最左前缀法则</h2><p>如果索引了多列，要遵守最左前缀法则。指的是查询从索引的最左前列开始并且不跳过索引中的列。</p>
+<img src="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20210929135723.png" alt="image-20210929135722952" style="zoom:50%;" />
+
+<img src="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20210929135750.png" alt="image-20210929135750389" style="zoom:50%;" />
+
+<img src="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20210929135841.png" alt="image-20210929135841460" style="zoom:50%;" />
+
+<h2 id="不在索引列上做任何操作"><a href="#不在索引列上做任何操作" class="headerlink" title="不在索引列上做任何操作"></a>不在索引列上做任何操作</h2><p>计算、函数、(自动or手动)类型转换，会导致索引失效而转向全表扫描</p>
+<img src="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20210929141145.png" alt="image-20210929141145463" style="zoom:50%;" />
+
+<img src="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20210929141214.png" alt="image-20210929141214291" style="zoom:50%;" />
+
+<ul>
+<li><p>给hire_time增加一个普通索引</p>
+<img src="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20210929141832.png" alt="image-20210929141832036" style="zoom:50%;" />
+</li>
+<li><p>转化为日期范围查询，有可能会走索引</p>
+<img src="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20210929142009.png" alt="image-20210929142009926" style="zoom:50%;" />
+</li>
+<li><p>还原最初索引状态</p>
+<img src="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20210929142200.png" alt="image-20210929142200223" style="zoom:50%;" />
+
+</li>
+</ul>
+<h2 id="存储引擎不能使用索引中范围条件右边的列"><a href="#存储引擎不能使用索引中范围条件右边的列" class="headerlink" title="存储引擎不能使用索引中范围条件右边的列"></a>存储引擎不能使用索引中范围条件右边的列</h2><img src="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20210929155323.png" alt="image-20210929155323904" style="zoom:50%;" />
+
+<img src="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20210929155401.png" alt="image-20210929155401263" style="zoom:50%;" />
+
+
+
+<h2 id="尽量使用覆盖索引"><a href="#尽量使用覆盖索引" class="headerlink" title="尽量使用覆盖索引"></a>尽量使用覆盖索引</h2><p>只访问索引的查询，因为索引列包含查询列，减少 select * 语句</p>
+<img src="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20210929155541.png" alt="image-20210929155541093" style="zoom:50%;" />
+
+<img src="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20210929155724.png" alt="image-20210929155724761" style="zoom:50%;" />
+
+
+
+<h2 id="尽量不使用范围查询"><a href="#尽量不使用范围查询" class="headerlink" title="尽量不使用范围查询"></a>尽量不使用范围查询</h2><p>mysql在使用不等于(!=或者&lt;&gt;)，not in ，not exists 的时候无法使用索引会导致全表扫描；</p>
+<p> &lt; 小于、 &gt; 大于、 &lt;=、&gt;= 这些，mysql内部优化器会根据检索比例、表大小等多个因素整体评估是否使用索引</p>
+<img src="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20210929155920.png" alt="image-20210929155920105" style="zoom:50%;" />
+
+
+
+<h2 id="尽量不使用空值判断"><a href="#尽量不使用空值判断" class="headerlink" title="尽量不使用空值判断"></a>尽量不使用空值判断</h2><p>is null,is not null 一般情况下也无法使用索引</p>
+<img src="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20210929160011.png" alt="image-20210929160011848" style="zoom:50%;" />
+
+
+
+<h2 id="尽量不使用like通配符开头"><a href="#尽量不使用like通配符开头" class="headerlink" title="尽量不使用like通配符开头"></a>尽量不使用like通配符开头</h2><p>like以通配符开头(‘$abc…’)mysql索引失效会变成全表扫描操作</p>
+<img src="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20210929160152.png" alt="image-20210929160152109" style="zoom:50%;" />
+
+<img src="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20210929160328.png" alt="image-20210929160328643" style="zoom:50%;" />
+
+
+
+<h2 id="解决like’-字符串-’索引不被使用"><a href="#解决like’-字符串-’索引不被使用" class="headerlink" title="解决like’%字符串%’索引不被使用"></a>解决like’%字符串%’索引不被使用</h2><p>a)使用覆盖索引，查询字段必须是建立覆盖索引字段</p>
+<img src="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20210929160445.png" alt="image-20210929160445626" style="zoom:50%;" />
+
+<p>b)如果不能使用覆盖索引则可能需要借助搜索引擎</p>
+<h2 id="字符串不加单引号索引失效"><a href="#字符串不加单引号索引失效" class="headerlink" title="字符串不加单引号索引失效"></a>字符串不加单引号索引失效</h2><img src="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20210929161120.png" alt="image-20210929161120410" style="zoom:50%;" />
+
+<img src="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20210929161548.png" alt="image-20210929161548156" style="zoom:50%;" />
+
+
+
+<h2 id="少用or或in"><a href="#少用or或in" class="headerlink" title="少用or或in"></a>少用or或in</h2><p>用它查询时，mysql不一定使用索引，mysql内部优化器会根据检索比例、表大小等多个因素整体评估是否使用索引</p>
+<img src="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20210929161907.png" alt="image-20210929161907486" style="zoom:50%;" />
+
+
+
+<h2 id="范围查询优化"><a href="#范围查询优化" class="headerlink" title="范围查询优化"></a>范围查询优化</h2><p>给年龄添加单值索引</p>
+<img src="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20210929162046.png" alt="image-20210929162046654" style="zoom:50%;" />
+
+<p><strong>没走索引原因</strong>:mysql内部优化器会根据检索比例、表大小等多个因素整体评估是否使用索引。比如这个例子，可能是由于单次数据量查询过大导致优化器最终选择不走索引</p>
+<p><strong>优化方法</strong>:可以将大的范围拆分成多个小范围</p>
+<img src="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20210929162215.png" alt="image-20210929162214954" style="zoom:50%;" />
+
+
+
+<p>还原最初索引状态</p>
+<img src="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20210929162252.png" alt="image-20210929162252047" style="zoom:50%;" />
+
+
+
+<h1 id="索引使用总结"><a href="#索引使用总结" class="headerlink" title="索引使用总结"></a>索引使用总结</h1><p><img src="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20210929162324.png" alt="image-20210929162324837"></p>
+<p>**like **查询</p>
+<p><strong>KK%相当于常量</strong></p>
+<p><strong>%KK和%KK% 相当于范围</strong></p>
+
+      
+    </div>
+    <div class="article-footer">
+      <blockquote class="mt-2x">
+  <ul class="post-copyright list-unstyled">
+    
+    <li class="post-copyright-link hidden-xs">
+      <strong>本文链接：</strong>
+      <a href="https://tj-ever.github.io/2021/09/23/MySQL%20%E7%B4%A2%E5%BC%95%E5%8F%8AExplain/" title="MySQL 索引和Explain执行计划" target="_blank" rel="external">https://tj-ever.github.io/2021/09/23/MySQL 索引及Explain/</a>
+    </li>
+    
+    <li class="post-copyright-license">
+      <strong>版权声明： </strong> 本博客所有文章除特别声明外，均采用 <a href="http://creativecommons.org/licenses/by/4.0/deed.zh" target="_blank" rel="external">CC BY 4.0 CN协议</a> 许可协议。转载请注明出处！
+    </li>
+  </ul>
+</blockquote>
+
+
+<div class="panel panel-default panel-badger">
+  <div class="panel-body">
+    <figure class="media">
+      <div class="media-left">
+        <a href="https://github.com/cofess" target="_blank" class="img-burn thumb-sm visible-lg">
+          <img src="/images/avatar.jpg" class="img-rounded w-full" alt="">
+        </a>
+      </div>
+      <div class="media-body">
+        <h3 class="media-heading"><a href="https://github.com/cofess" target="_blank"><span class="text-dark">Ever</span><small class="ml-1x">Ever的个人博客</small></a></h3>
+        <div>啊啊啊啊这功能做不了。</div>
+      </div>
+    </figure>
+  </div>
+</div>
+
+
+    </div>
+  </article>
+  
+    
+  <section id="comments">
+  	
+      <div id="vcomments"></div>
+    
+  </section>
+
+
+  
+</div>
+
+  <nav class="bar bar-footer clearfix" data-stick-bottom>
+  <div class="bar-inner">
+  
+  <ul class="pager pull-left">
+    
+    <li class="prev">
+      <a href="/2021/09/29/MySQL%20%E5%86%85%E9%83%A8%E7%BB%93%E6%9E%84%20BinLog/" title="MySQL 内部结构 BinLog"><i class="icon icon-angle-left" aria-hidden="true"></i><span>&nbsp;&nbsp;上一篇</span></a>
+    </li>
+    
+    
+    <li class="next">
+      <a href="/2021/09/16/JVM%20Arthas%E4%BD%BF%E7%94%A8%E5%8F%8A%E5%AD%97%E7%AC%A6%E4%B8%B2%E5%B8%B8%E9%87%8F%E6%B1%A0/" title="JVM Arthas使用及字符串常量池"><span>下一篇&nbsp;&nbsp;</span><i class="icon icon-angle-right" aria-hidden="true"></i></a>
+    </li>
+    
+    
+  </ul>
+  
+  
+  <!-- Button trigger modal -->
+  <button type="button" class="btn btn-fancy btn-donate pop-onhover bg-gradient-warning" data-toggle="modal" data-target="#donateModal"><span>赏</span></button>
+  <!-- <div class="wave-icon wave-icon-danger btn-donate" data-toggle="modal" data-target="#donateModal">
+    <div class="wave-circle"><span class="icon"><i class="icon icon-bill"></i></span></div>
+  </div> -->
+  
+  
+  <div class="bar-right">
+    
+    <div class="share-component" data-sites="weibo,qq,wechat,facebook,twitter" data-mobile-sites="weibo,qq,qzone"></div>
+    
+  </div>
+  </div>
+</nav>
+  
+<!-- Modal -->
+<div class="modal modal-center modal-small modal-xs-full fade" id="donateModal" tabindex="-1" role="dialog">
+  <div class="modal-dialog" role="document">
+    <div class="modal-content donate">
+      <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+      <div class="modal-body">
+        <div class="donate-box">
+          <div class="donate-head">
+            <p>感谢您的支持，我会继续努力的!</p>
+          </div>
+          <div class="tab-content">
+            <div role="tabpanel" class="tab-pane fade active in" id="alipay">
+              <div class="donate-payimg">
+                <img src="/images/donate/alipayimg.png" alt="扫码支持" title="扫一扫" />
+              </div>
+              <p class="text-muted mv">扫码打赏，你说多少就多少</p>
+              <p class="text-grey">打开支付宝扫一扫，即可进行扫码打赏哦</p>
+            </div>
+            <div role="tabpanel" class="tab-pane fade" id="wechatpay">
+              <div class="donate-payimg">
+                <img src="/images/donate/wechatpayimg.png" alt="扫码支持" title="扫一扫" />
+              </div>
+              <p class="text-muted mv">扫码打赏，你说多少就多少</p>
+              <p class="text-grey">打开微信扫一扫，即可进行扫码打赏哦</p>
+            </div>
+          </div>
+          <div class="donate-footer">
+            <ul class="nav nav-tabs nav-justified" role="tablist">
+              <li role="presentation" class="active">
+                <a href="#alipay" id="alipay-tab" role="tab" data-toggle="tab" aria-controls="alipay" aria-expanded="true"><i class="icon icon-alipay"></i> 支付宝</a>
+              </li>
+              <li role="presentation" class="">
+                <a href="#wechatpay" role="tab" id="wechatpay-tab" data-toggle="tab" aria-controls="wechatpay" aria-expanded="false"><i class="icon icon-wepay"></i> 微信支付</a>
+              </li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+
+</main>
+
+  <footer class="footer" itemscope itemtype="http://schema.org/WPFooter">
+	
+	
+    <ul class="social-links">
+    	
+        <li><a href="https://weibo.com/u/2735829887" target="_blank" title="Weibo" data-toggle=tooltip data-placement=top><i class="icon icon-weibo"></i></a></li>
+        
+    </ul>
+
+    <div class="copyright">
+    	
+        <div class="publishby">
+        	Theme by <a href="https://github.com/cofess" target="_blank"> cofess </a>base on <a href="https://github.com/cofess/hexo-theme-pure" target="_blank">pure</a>.
+        </div>
+    </div>
+</footer>
+  <script src="//cdn.jsdelivr.net/npm/jquery@1.12.4/dist/jquery.min.js"></script>
+<script>
+window.jQuery || document.write('<script src="js/jquery.min.js"><\/script>')
+</script>
+
+<script src="/js/plugin.min.js"></script>
+
+
+<script src="/js/application.js"></script>
+
+
+    <script>
+(function (window) {
+    var INSIGHT_CONFIG = {
+        TRANSLATION: {
+            POSTS: '文章',
+            PAGES: '页面',
+            CATEGORIES: '分类',
+            TAGS: '标签',
+            UNTITLED: '(未命名)',
+        },
+        ROOT_URL: '/',
+        CONTENT_URL: '/content.json',
+    };
+    window.INSIGHT_CONFIG = INSIGHT_CONFIG;
+})(window);
+</script>
+
+<script src="/js/insight.js"></script>
+
+
+
+
+
+
+   
+
+
+
+
+   
+    
+  <script src="//cdn1.lncld.net/static/js/3.0.4/av-min.js"></script>
+  <script src="//cdn.jsdelivr.net/npm/valine"></script>
+  <script type="text/javascript">
+  var GUEST = ['nick', 'mail', 'link'];
+  var meta = 'nick,mail,link';
+  meta = meta.split(',').filter(function(item) {
+    return GUEST.indexOf(item) > -1;
+  });
+  new Valine({
+    el: '#vcomments',
+    verify: false,
+    notify: false,
+    appId: '',
+    appKey: '',
+    placeholder: 'Just go go',
+    avatar: 'mm',
+    meta: meta,
+    pageSize: '10' || 10,
+    visitor: false
+  });
+  </script>
+
+     
+
+
+
+
+
+
+
+</body>
+</html>

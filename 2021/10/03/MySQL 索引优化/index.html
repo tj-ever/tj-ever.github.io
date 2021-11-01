@@ -1,0 +1,932 @@
+<!DOCTYPE html>
+<html lang=zh>
+<head>
+  <meta charset="utf-8">
+  
+  <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no, minimal-ui">
+  <meta name="renderer" content="webkit">
+  <meta http-equiv="Cache-Control" content="no-transform" />
+  <meta http-equiv="Cache-Control" content="no-siteapp" />
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <meta name="format-detection" content="telephone=no,email=no,adress=no">
+  <!-- Color theme for statusbar -->
+  <meta name="theme-color" content="#000000" />
+  <!-- 强制页面在当前窗口以独立页面显示,防止别人在框架里调用页面 -->
+  <meta http-equiv="window-target" content="_top" />
+  
+  
+  <title>MySQL 索引优化 | Ever的个人博客</title>
+  <meta name="description" content="示例表12345678910111213141516171819202122232425262728CREATE TABLE &#96;employees&#96; (&#96;id&#96; int(11) NOT NULL AUTO_INCREMENT,&#96;name&#96; varchar(24) NOT NULL DEFAULT &amp;#x27;&amp;#x27; COMMENT &amp;#x27;姓名&amp;#x27;,&#96;age&#96; int(11) N">
+<meta property="og:type" content="article">
+<meta property="og:title" content="MySQL 索引优化">
+<meta property="og:url" content="https://tj-ever.github.io/2021/10/03/MySQL%20%E7%B4%A2%E5%BC%95%E4%BC%98%E5%8C%96/index.html">
+<meta property="og:site_name" content="Ever的个人博客">
+<meta property="og:description" content="示例表12345678910111213141516171819202122232425262728CREATE TABLE &#96;employees&#96; (&#96;id&#96; int(11) NOT NULL AUTO_INCREMENT,&#96;name&#96; varchar(24) NOT NULL DEFAULT &amp;#x27;&amp;#x27; COMMENT &amp;#x27;姓名&amp;#x27;,&#96;age&#96; int(11) N">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20211003203235.png">
+<meta property="og:image" content="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20211003203337.png">
+<meta property="og:image" content="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20211003204247.png">
+<meta property="og:image" content="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20211003204402.png">
+<meta property="og:image" content="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20211003204615.png">
+<meta property="og:image" content="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20211003204718.png">
+<meta property="og:image" content="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20211003204839.png">
+<meta property="og:image" content="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20211003205827.png">
+<meta property="og:image" content="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20211003211051.png">
+<meta property="og:image" content="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20211003211154.png">
+<meta property="og:image" content="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20211003211457.png">
+<meta property="og:image" content="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20211003212147.png">
+<meta property="og:image" content="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20211003214116.png">
+<meta property="og:image" content="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20211003215700.png">
+<meta property="og:image" content="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20211003215755.png">
+<meta property="og:image" content="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20211003220032.png">
+<meta property="og:image" content="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20211003220306.png">
+<meta property="og:image" content="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20211004215616.png">
+<meta property="og:image" content="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20211003220906.png">
+<meta property="og:image" content="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20211003221538.png">
+<meta property="og:image" content="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20211004000504.png">
+<meta property="og:image" content="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20211004000424.png">
+<meta property="og:image" content="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20211004001016.png">
+<meta property="og:image" content="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20211004001500.png">
+<meta property="og:image" content="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20211004003455.png">
+<meta property="og:image" content="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20211004153011.png">
+<meta property="article:published_time" content="2021-10-02T16:00:00.000Z">
+<meta property="article:modified_time" content="2021-10-04T13:56:19.742Z">
+<meta property="article:author" content="Ever">
+<meta property="article:tag" content="MySQL">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20211003203235.png">
+  <!-- Canonical links -->
+  <link rel="canonical" href="https://tj-ever.github.io/2021/10/03/MySQL%20%E7%B4%A2%E5%BC%95%E4%BC%98%E5%8C%96/index.html">
+  
+    <link rel="alternate" href="/atom.xml" title="Ever的个人博客" type="application/atom+xml">
+  
+  
+    <link rel="icon" href="/favicon.png" type="image/x-icon">
+  
+  
+<link rel="stylesheet" href="/css/style.css">
+
+  
+  
+  
+  
+<meta name="generator" content="Hexo 5.2.0"></head>
+
+
+<body class="main-center" itemscope itemtype="http://schema.org/WebPage">
+  <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+  <div class="slimContent">
+    <div class="navbar-header">
+      
+      
+      <div class="profile-block text-center">
+        <a id="avatar" href="https://github.com/cofess" target="_blank">
+          <img class="img-circle img-rotate" src="/images/avatar.jpg" width="200" height="200">
+        </a>
+        <h2 id="name" class="hidden-xs hidden-sm">Ever</h2>
+        <h3 id="title" class="hidden-xs hidden-sm hidden-md">Ever的个人博客</h3>
+        <small id="location" class="text-muted hidden-xs hidden-sm"><i class="icon icon-map-marker"></i> Xian, China</small>
+      </div>
+      
+      <div class="search" id="search-form-wrap">
+
+    <form class="search-form sidebar-form">
+        <div class="input-group">
+            <input type="text" class="search-form-input form-control" placeholder="搜索" />
+            <span class="input-group-btn">
+                <button type="submit" class="search-form-submit btn btn-flat" onclick="return false;"><i class="icon icon-search"></i></button>
+            </span>
+        </div>
+    </form>
+    <div class="ins-search">
+  <div class="ins-search-mask"></div>
+  <div class="ins-search-container">
+    <div class="ins-input-wrapper">
+      <input type="text" class="ins-search-input" placeholder="想要查找什么..." x-webkit-speech />
+      <button type="button" class="close ins-close ins-selectable" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">×</span></button>
+    </div>
+    <div class="ins-section-wrapper">
+      <div class="ins-section-container"></div>
+    </div>
+  </div>
+</div>
+
+
+</div>
+      <button class="navbar-toggle collapsed" type="button" data-toggle="collapse" data-target="#main-navbar" aria-controls="main-navbar" aria-expanded="false">
+        <span class="sr-only">Toggle navigation</span>
+        <span class="icon-bar"></span>
+        <span class="icon-bar"></span>
+        <span class="icon-bar"></span>
+      </button>
+    </div>
+    <nav id="main-navbar" class="collapse navbar-collapse" itemscope itemtype="http://schema.org/SiteNavigationElement" role="navigation">
+      <ul class="nav navbar-nav main-nav ">
+        
+        
+        <li class="menu-item menu-item-home">
+          <a href="/.">
+            
+            <i class="icon icon-home-fill"></i>
+            
+            <span class="menu-title">首页</span>
+          </a>
+        </li>
+        
+        
+        <li class="menu-item menu-item-archives">
+          <a href="/archives">
+            
+            <i class="icon icon-archives-fill"></i>
+            
+            <span class="menu-title">归档</span>
+          </a>
+        </li>
+        
+        
+        <li class="menu-item menu-item-categories">
+          <a href="/categories">
+            
+            <i class="icon icon-folder"></i>
+            
+            <span class="menu-title">分类</span>
+          </a>
+        </li>
+        
+        
+        <li class="menu-item menu-item-tags">
+          <a href="/tags">
+            
+            <i class="icon icon-tags"></i>
+            
+            <span class="menu-title">标签</span>
+          </a>
+        </li>
+        
+        
+        <li class="menu-item menu-item-repository">
+          <a href="/repository">
+            
+            <i class="icon icon-project"></i>
+            
+            <span class="menu-title">项目</span>
+          </a>
+        </li>
+        
+        
+        <li class="menu-item menu-item-books">
+          <a href="/books">
+            
+            <i class="icon icon-book-fill"></i>
+            
+            <span class="menu-title">书单</span>
+          </a>
+        </li>
+        
+        
+        <li class="menu-item menu-item-links">
+          <a href="/links">
+            
+            <i class="icon icon-friendship"></i>
+            
+            <span class="menu-title">友链</span>
+          </a>
+        </li>
+        
+        
+        <li class="menu-item menu-item-about">
+          <a href="/about">
+            
+            <i class="icon icon-cup-fill"></i>
+            
+            <span class="menu-title">关于</span>
+          </a>
+        </li>
+        
+      </ul>
+      
+	
+    <ul class="social-links">
+    	
+        <li><a href="https://weibo.com/u/2735829887" target="_blank" title="Weibo" data-toggle=tooltip data-placement=top><i class="icon icon-weibo"></i></a></li>
+        
+    </ul>
+
+    </nav>
+  </div>
+</header>
+
+  
+    <aside class="sidebar" itemscope itemtype="http://schema.org/WPSideBar">
+  <div class="slimContent">
+    
+      <div class="widget">
+    <h3 class="widget-title">公告</h3>
+    <div class="widget-body">
+        <div id="board">
+            <div class="content">
+                <p>qq:&nbsp471958719</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+    
+      
+
+    
+      
+  <div class="widget">
+    <h3 class="widget-title">标签</h3>
+    <div class="widget-body">
+      <ul class="tag-list" itemprop="keywords"><li class="tag-list-item"><a class="tag-list-link" href="/tags/JVM/" rel="tag">JVM</a><span class="tag-list-count">4</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/JVM-Arthas/" rel="tag">JVM Arthas</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/MySQL/" rel="tag">MySQL</a><span class="tag-list-count">5</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Zookeeper/" rel="tag">Zookeeper</a><span class="tag-list-count">3</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/docker/" rel="tag">docker</a><span class="tag-list-count">3</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/hashmap/" rel="tag">hashmap</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/k8s/" rel="tag">k8s</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/linux/" rel="tag">linux</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/oracle/" rel="tag">oracle</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/rabbitmq/" rel="tag">rabbitmq</a><span class="tag-list-count">3</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/redis/" rel="tag">redis</a><span class="tag-list-count">3</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/sql/" rel="tag">sql</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E5%89%8D%E7%AB%AF/" rel="tag">前端</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E5%B9%B6%E5%8F%91%E7%BC%96%E7%A8%8B/" rel="tag">并发编程</a><span class="tag-list-count">7</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E7%8E%AF%E5%A2%83%E6%90%AD%E5%BB%BA/" rel="tag">环境搭建</a><span class="tag-list-count">1</span></li></ul>
+    </div>
+  </div>
+
+
+    
+      
+  <div class="widget">
+    <h3 class="widget-title">标签云</h3>
+    <div class="widget-body tagcloud">
+      <a href="/tags/JVM/" style="font-size: 13.5px;">JVM</a> <a href="/tags/JVM-Arthas/" style="font-size: 13px;">JVM Arthas</a> <a href="/tags/MySQL/" style="font-size: 13.75px;">MySQL</a> <a href="/tags/Zookeeper/" style="font-size: 13.25px;">Zookeeper</a> <a href="/tags/docker/" style="font-size: 13.25px;">docker</a> <a href="/tags/hashmap/" style="font-size: 13px;">hashmap</a> <a href="/tags/k8s/" style="font-size: 13px;">k8s</a> <a href="/tags/linux/" style="font-size: 13px;">linux</a> <a href="/tags/oracle/" style="font-size: 13px;">oracle</a> <a href="/tags/rabbitmq/" style="font-size: 13.25px;">rabbitmq</a> <a href="/tags/redis/" style="font-size: 13.25px;">redis</a> <a href="/tags/sql/" style="font-size: 13px;">sql</a> <a href="/tags/%E5%89%8D%E7%AB%AF/" style="font-size: 13px;">前端</a> <a href="/tags/%E5%B9%B6%E5%8F%91%E7%BC%96%E7%A8%8B/" style="font-size: 14px;">并发编程</a> <a href="/tags/%E7%8E%AF%E5%A2%83%E6%90%AD%E5%BB%BA/" style="font-size: 13px;">环境搭建</a>
+    </div>
+  </div>
+
+    
+      
+  <div class="widget">
+    <h3 class="widget-title">归档</h3>
+    <div class="widget-body">
+      <ul class="archive-list"><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/11/">十一月 2021</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/10/">十月 2021</a><span class="archive-list-count">8</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/09/">九月 2021</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/08/">八月 2021</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/07/">七月 2021</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/06/">六月 2021</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/12/">十二月 2020</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/11/">十一月 2020</a><span class="archive-list-count">6</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/10/">十月 2020</a><span class="archive-list-count">5</span></li></ul>
+    </div>
+  </div>
+
+
+    
+      
+  <div class="widget">
+    <h3 class="widget-title">最新文章</h3>
+    <div class="widget-body">
+      <ul class="recent-post-list list-unstyled no-thumbnail">
+        
+          <li>
+            
+            <div class="item-inner">
+              <p class="item-category">
+                
+              </p>
+              <p class="item-title">
+                <a href="/2021/11/01/Rabbitmq%E5%AE%9E%E7%8E%B0%E6%B6%88%E6%81%AF%E5%8F%AF%E9%9D%A0%E6%80%A7%E6%8A%95%E9%80%92/" class="title">Rabbitmq 消息可靠性投递两种方案</a>
+              </p>
+              <p class="item-date">
+                <time datetime="2021-10-31T16:00:00.000Z" itemprop="datePublished">2021-11-01</time>
+              </p>
+            </div>
+          </li>
+          
+          <li>
+            
+            <div class="item-inner">
+              <p class="item-category">
+                
+              </p>
+              <p class="item-title">
+                <a href="/2021/10/25/Rabbitmq%20%E9%AB%98%E7%BA%A7%E7%89%B9%E6%80%A7%E5%8F%8A%E6%95%B4%E5%90%88springboot/" class="title">Rabbitmq 高级特性及整合springboot</a>
+              </p>
+              <p class="item-date">
+                <time datetime="2021-10-24T16:00:00.000Z" itemprop="datePublished">2021-10-25</time>
+              </p>
+            </div>
+          </li>
+          
+          <li>
+            
+            <div class="item-inner">
+              <p class="item-category">
+                
+              </p>
+              <p class="item-title">
+                <a href="/2021/10/22/Rabbitmq%20%E7%8E%AF%E5%A2%83%E6%90%AD%E5%BB%BA%E5%8F%8A%E5%9F%BA%E6%9C%AC%E4%BD%BF%E7%94%A8/" class="title">Rabbitmq 环境搭建及基本使用</a>
+              </p>
+              <p class="item-date">
+                <time datetime="2021-10-21T16:00:00.000Z" itemprop="datePublished">2021-10-22</time>
+              </p>
+            </div>
+          </li>
+          
+          <li>
+            
+            <div class="item-inner">
+              <p class="item-category">
+                
+              </p>
+              <p class="item-title">
+                <a href="/2021/10/21/zookeeper%20leader/" class="title">Zookeeper 源码构建 阅读</a>
+              </p>
+              <p class="item-date">
+                <time datetime="2021-10-20T16:00:00.000Z" itemprop="datePublished">2021-10-21</time>
+              </p>
+            </div>
+          </li>
+          
+          <li>
+            
+            <div class="item-inner">
+              <p class="item-category">
+                
+              </p>
+              <p class="item-title">
+                <a href="/2021/10/07/Zookeeper%20%E5%AE%A2%E6%88%B7%E7%AB%AF%E4%BD%BF%E7%94%A8%E5%8F%8A%E9%9B%86%E7%BE%A4/" class="title">Zookeeper 客户端使用及集群</a>
+              </p>
+              <p class="item-date">
+                <time datetime="2021-10-06T16:00:00.000Z" itemprop="datePublished">2021-10-07</time>
+              </p>
+            </div>
+          </li>
+          
+      </ul>
+    </div>
+  </div>
+  
+
+    
+  </div>
+</aside>
+
+  
+  
+<main class="main" role="main">
+  <div class="content">
+  <article id="post-MySQL 索引优化" class="article article-type-post" itemscope itemtype="http://schema.org/BlogPosting">
+    
+    <div class="article-header">
+      
+        
+  
+    <h1 class="article-title" itemprop="name">
+      MySQL 索引优化
+    </h1>
+  
+
+      
+      <div class="article-meta">
+        <span class="article-date">
+    <i class="icon icon-calendar-check"></i>
+	<a href="/2021/10/03/MySQL%20%E7%B4%A2%E5%BC%95%E4%BC%98%E5%8C%96/" class="article-date">
+	  <time datetime="2021-10-02T16:00:00.000Z" itemprop="datePublished">2021-10-03</time>
+	</a>
+</span>
+        
+        
+  <span class="article-tag">
+    <i class="icon icon-tags"></i>
+	<a class="article-tag-link-link" href="/tags/MySQL/" rel="tag">MySQL</a>
+  </span>
+
+
+        
+
+        <span class="post-comment"><i class="icon icon-comment"></i> <a href="/2021/10/03/MySQL%20%E7%B4%A2%E5%BC%95%E4%BC%98%E5%8C%96/#comments" class="article-comment-link">评论</a></span>
+        
+      </div>
+    </div>
+    <div class="article-entry marked-body" itemprop="articleBody">
+      
+        <h1 id="示例表"><a href="#示例表" class="headerlink" title="示例表"></a>示例表</h1><figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">CREATE</span> <span class="keyword">TABLE</span> <span class="string">`employees`</span> (</span><br><span class="line"><span class="string">`id`</span> <span class="built_in">int</span>(<span class="number">11</span>) <span class="keyword">NOT</span> <span class="literal">NULL</span> AUTO_INCREMENT,</span><br><span class="line"><span class="string">`name`</span> <span class="built_in">varchar</span>(<span class="number">24</span>) <span class="keyword">NOT</span> <span class="literal">NULL</span> <span class="keyword">DEFAULT</span> <span class="string">&#x27;&#x27;</span> <span class="keyword">COMMENT</span> <span class="string">&#x27;姓名&#x27;</span>,</span><br><span class="line"><span class="string">`age`</span> <span class="built_in">int</span>(<span class="number">11</span>) <span class="keyword">NOT</span> <span class="literal">NULL</span> <span class="keyword">DEFAULT</span> <span class="string">&#x27;0&#x27;</span> <span class="keyword">COMMENT</span> <span class="string">&#x27;年龄&#x27;</span>,</span><br><span class="line"><span class="string">`position`</span> <span class="built_in">varchar</span>(<span class="number">20</span>) <span class="keyword">NOT</span> <span class="literal">NULL</span> <span class="keyword">DEFAULT</span> <span class="string">&#x27;&#x27;</span> <span class="keyword">COMMENT</span> <span class="string">&#x27;职位&#x27;</span>,</span><br><span class="line"><span class="string">`hire_time`</span> <span class="built_in">timestamp</span> <span class="keyword">NOT</span> <span class="literal">NULL</span> <span class="keyword">DEFAULT</span> <span class="keyword">CURRENT_TIMESTAMP</span> <span class="keyword">COMMENT</span> <span class="string">&#x27;入职时间&#x27;</span>,</span><br><span class="line">PRIMARY <span class="keyword">KEY</span> (<span class="string">`id`</span>),</span><br><span class="line"><span class="keyword">KEY</span> <span class="string">`idx_name_age_position`</span> (<span class="string">`name`</span>,<span class="string">`age`</span>,<span class="string">`position`</span>) <span class="keyword">USING</span> BTREE</span><br><span class="line">) <span class="keyword">ENGINE</span>=<span class="keyword">InnoDB</span> AUTO_INCREMENT=<span class="number">1</span> <span class="keyword">DEFAULT</span> <span class="keyword">CHARSET</span>=utf8 <span class="keyword">COMMENT</span>=<span class="string">&#x27;员工记录表&#x27;</span>;</span><br><span class="line"></span><br><span class="line"><span class="keyword">INSERT</span> <span class="keyword">INTO</span> employees(<span class="keyword">name</span>,age,<span class="keyword">position</span>,hire_time) <span class="keyword">VALUES</span>(<span class="string">&#x27;LiLei&#x27;</span>,<span class="number">22</span>,<span class="string">&#x27;manager&#x27;</span>,<span class="keyword">NOW</span>());</span><br><span class="line"><span class="keyword">INSERT</span> <span class="keyword">INTO</span> employees(<span class="keyword">name</span>,age,<span class="keyword">position</span>,hire_time) <span class="keyword">VALUES</span>(<span class="string">&#x27;HanMeimei&#x27;</span>, <span class="number">23</span>,<span class="string">&#x27;dev&#x27;</span>,<span class="keyword">NOW</span>());</span><br><span class="line"><span class="keyword">INSERT</span> <span class="keyword">INTO</span> employees(<span class="keyword">name</span>,age,<span class="keyword">position</span>,hire_time) <span class="keyword">VALUES</span>(<span class="string">&#x27;Lucy&#x27;</span>,<span class="number">23</span>,<span class="string">&#x27;dev&#x27;</span>,<span class="keyword">NOW</span>());</span><br><span class="line"></span><br><span class="line">‐‐ 插入一些示例数据</span><br><span class="line"><span class="keyword">drop</span> <span class="keyword">procedure</span> <span class="keyword">if</span> <span class="keyword">exists</span> insert_emp;</span><br><span class="line">delimiter ;;</span><br><span class="line"><span class="keyword">create</span> <span class="keyword">procedure</span> insert_emp()</span><br><span class="line"><span class="keyword">begin</span></span><br><span class="line"><span class="keyword">declare</span> i <span class="built_in">int</span>;</span><br><span class="line"><span class="keyword">set</span> i=<span class="number">1</span>;</span><br><span class="line">while(i&lt;=100000)do</span><br><span class="line"><span class="keyword">insert</span> <span class="keyword">into</span> employees(<span class="keyword">name</span>,age,<span class="keyword">position</span>) <span class="keyword">values</span>(<span class="keyword">CONCAT</span>(<span class="string">&#x27;zhuge&#x27;</span>,i),i,<span class="string">&#x27;dev&#x27;</span>);</span><br><span class="line"><span class="keyword">set</span> i=i+<span class="number">1</span>;</span><br><span class="line"><span class="keyword">end</span> <span class="keyword">while</span>;</span><br><span class="line"><span class="keyword">end</span>;;</span><br><span class="line">delimiter ;</span><br><span class="line"><span class="keyword">call</span> insert_emp();</span><br></pre></td></tr></table></figure>
+
+
+
+<h1 id="例子"><a href="#例子" class="headerlink" title="例子"></a>例子</h1><ol>
+<li><p><strong>联合索引第一个字段用范围不会走索引</strong></p>
+<p><img src="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20211003203235.png" alt="image-20211003203235547"></p>
+<p>结论:联合索引第一个字段就用范围查找不会走索引，mysql内部可能觉得第一个字段就用范围，结果集应该很大，回表效率不高，还不如就全表扫描</p>
+</li>
+<li><p><strong>强制走索引</strong></p>
+<p><img src="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20211003203337.png" alt="image-20211003203337931"></p>
+<p>结论:虽然使用了强制走索引让联合索引第一个字段范围查找也走索引，扫描的行rows看上去也少了点，但是最终查找效率不一定比全表扫描高，因为回表效率不高</p>
+<p>做个小实验</p>
+<p>首先关闭查询缓存</p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">set</span> <span class="keyword">global</span> query_cache_size=<span class="number">0</span>;</span><br><span class="line"><span class="keyword">set</span> <span class="keyword">global</span> query_cache_type=<span class="number">0</span>;</span><br></pre></td></tr></table></figure>
+
+<p>使用mysql自行优化，耗时0.165s</p>
+<img src="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20211003204247.png" alt="image-20211003204247321" style="zoom:50%;" />
+
+<p>使用强制索引，耗时0.294s</p>
+<img src="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20211003204402.png" alt="image-20211003204402646" style="zoom:50%;" />
+
+
+
+</li>
+</ol>
+<ol start="3">
+<li><p><strong>覆盖索引优化</strong></p>
+<p>扫描的字段都在覆盖索引上，此时范围查找可能会走索引</p>
+<img src="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20211003204615.png" alt="image-20211003204615344" style="zoom:50%;" />
+</li>
+<li><p><strong>in和or在表数据量比较大的情况会走索引，在表记录不多的情况下会选择全表扫描</strong></p>
+<p>复制employees到另一张表，只留三条记录，查询类型将会是全表扫描</p>
+<img src="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20211003204718.png" alt="image-20211003204718564" style="zoom:50%;" />
+
+<img src="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20211003204839.png" alt="image-20211003204839949" style="zoom:50%;" />
+</li>
+<li><p><strong>like KK% 一般情况都会走索引</strong></p>
+<img src="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20211003205827.png" alt="image-20211003205827844" style="zoom:50%;" />
+
+
+
+</li>
+</ol>
+<p>   这里给大家补充一个概念，索引下推(Index Condition Pushdown，ICP)</p>
+<p>   like KK%其实就是用到了索引下推优化<br>   对于辅助的联合索引(name,age,position)，正常情况按照最左前缀原则，</p>
+   <figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">SELECT</span> * <span class="keyword">FROM</span> employees <span class="keyword">WHERE</span> <span class="keyword">name</span> <span class="keyword">like</span> <span class="string">&#x27;LiLei%&#x27;</span> <span class="keyword">AND</span> age = <span class="number">22</span> <span class="keyword">AND</span> <span class="keyword">position</span> =<span class="string">&#x27;manager&#x27;</span></span><br></pre></td></tr></table></figure>
+
+<p>   这种情况只会走name字段索引，因为根据name字段过滤完，得到的索引行里的age和 position是无序的，无法很好的利用索引。</p>
+<p>   在MySQL5.6之前的版本，这个查询只能在联合索引里匹配到名字是 ‘LiLei’ 开头的索引，然后拿这些索引对应的主键逐个回表，到主键索引上找出相应的记录，再比对age和position这两个字段的值是否符合。</p>
+<p>   MySQL 5.6引入了索引下推优化，可以在索引遍历过程中，对索引中包含的所有字段先做判断，过滤掉不符合条件的记录之后再回表，可以有效的减少回表次数。使用了索引下推优化后，<strong>上面那个查询在联合索引里匹配到名字是 ‘LiLei’ 开头的索引之后，同时还会在索引里过滤age和position这两个字段，拿着过滤完剩下的索引对应的主键id再回表查整行数据。</strong></p>
+<p>   <strong>索引下推会减少回表次数，对于innodb引擎的表索引下推只能用于二级索引，innodb的主键索引(聚簇索引)树叶子节点上保存的是全行数据，所以这个时候索引下推并不会起到减少查询全行数据的效果。</strong></p>
+<p>   为什么范围查找Mysql没有用索引下推优化?<br>   估计应该是Mysql认为范围查找过滤的结果集过大，like KK% 在绝大多数情况来看，过滤后的结果集比较小，所以这里Mysql选择给 like KK% 用了索引下推优化，当然这也不是绝对的，有时like KK% 也不一定就会走索引下推。</p>
+<h1 id="Mysql索引选择"><a href="#Mysql索引选择" class="headerlink" title="Mysql索引选择"></a>Mysql索引选择</h1><img src="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20211003211051.png" alt="image-20211003211051676" style="zoom:50%;" />
+
+
+
+<p>如果用name索引需要遍历name字段联合索引树，然后还需要根据遍历出来的主键值去主键索引树里再去查出最终数据，成本比全表扫描还高，可以用覆盖索引优化，这样只需要遍历name字段的联合索引树就能拿到所有结果，如下:</p>
+<img src="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20211003211154.png" alt="image-20211003211154826" style="zoom:50%;" />
+
+<p>但是，下面这个sql却走了索引</p>
+<img src="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20211003211457.png" alt="image-20211003211457813" style="zoom:50%;" />
+
+
+
+<p>对于上面这两种 name&gt;’a’ 和 name&gt;’zzz’ 的执行结果，mysql最终是否选择走索引或者一张表涉及多个索引，mysql最终如何选择索引，我们可以用<strong>trace工具</strong>来一查究竟。</p>
+<p>开启trace工具会影响mysql性能，所以只能临时分析sql使用，用完之后立即关闭</p>
+<p>此处略过trace工具使用（我踏🐎觉得面试官也不会）</p>
+<h1 id="常见sql深入优化"><a href="#常见sql深入优化" class="headerlink" title="常见sql深入优化"></a>常见sql深入优化</h1><h2 id="Order-by与Group-by优化"><a href="#Order-by与Group-by优化" class="headerlink" title="Order by与Group by优化"></a>Order by与Group by优化</h2><ol>
+<li><p>case1</p>
+<img src="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20211003212147.png" alt="image-20211003212147546" style="zoom:50%;" />
+
+<p>利用最左前缀法则:中间字段不能断，因此查询用到了name索引，从key_len=74也能看出，age索引列用在排序过程中，因为Extra字段里没有using filesort</p>
+</li>
+<li><p>case2</p>
+<p><img src="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20211003214116.png" alt="image-20211003214011350"></p>
+<p>从explain的执行结果来看:key_len=74，查询使用了name索引，由于用了position进行排序，跳过了 age，出现了Using filesort。</p>
+</li>
+<li><p>case3</p>
+<p><img src="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20211003215700.png" alt="image-20211003215700820"></p>
+<p>查找只用到索引name，age和position用于排序，无Using filesort。</p>
+</li>
+<li><p>case4</p>
+<p><img src="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20211003215755.png" alt="image-20211003215755741"></p>
+<p>和Case 3中explain的执行结果一样，但是出现了Using filesort，因为索引的创建顺序为 name,age,position，但是排序的时候age和position颠倒位置了。</p>
+</li>
+<li><p>case5</p>
+<p><img src="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20211003220032.png" alt="image-20211003220032127"></p>
+<p>与Case 4对比，在Extra中并未出现Using filesort，因为age为常量，在排序中被优化，所以索引未颠倒， 不会出现Using filesort。</p>
+</li>
+<li><p>case6</p>
+<p><img src="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20211003220306.png" alt="image-20211003220306344"></p>
+<p>虽然排序的字段列与索引顺序一样，且order by默认升序，这里position desc变成了降序，导致与索引的排序方式不同，从而产生Using filesort。</p>
+<p><strong>Mysql8以上版本有降序索引可以支持该种查询方式。</strong></p>
+</li>
+<li><p>case7</p>
+<p><img src="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20211004215616.png" alt="image-20211003220546261"></p>
+<p>对于排序来说，多个相等条件也是范围查询</p>
+</li>
+<li><p>case8</p>
+<p><img src="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20211003220906.png" alt="image-20211003220906230"></p>
+<p>这种情况可以用覆盖索引优化</p>
+<p><img src="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20211003221538.png" alt="image-20211003221538426"></p>
+</li>
+</ol>
+<h2 id="优化总结"><a href="#优化总结" class="headerlink" title="优化总结"></a>优化总结</h2><ul>
+<li>MySQL支持两种方式的排序filesort和index，Using index是指MySQL扫描索引本身完成排序。index效率高，filesort效率低。</li>
+<li>order by满足两种情况会使用Using index。<ul>
+<li>order by语句使用索引最左前列。</li>
+<li>使用where子句与order by子句条件列组合满足索引最左前列。</li>
+</ul>
+</li>
+<li> 尽量在索引列上完成排序，遵循索引建立(索引创建的顺序)时的最左前缀法则。</li>
+<li>如果order by的条件不在索引列上，就会产生Using filesort。</li>
+<li>能用覆盖索引尽量用覆盖索引</li>
+<li>group by与order by很类似，其实质是先排序后分组，遵照索引创建顺序的最左前缀法则。对于group by的优化如果不需要排序的可以加上order by null禁止排序。注意，where高于having，能写在where中的限定条件就不要去having限定了。</li>
+</ul>
+<h2 id="Using-filesort文件排序"><a href="#Using-filesort文件排序" class="headerlink" title="Using filesort文件排序"></a>Using filesort文件排序</h2><p>filesort文件排序方式</p>
+<ul>
+<li><p>单路排序：是一次性取出满足条件行的所有字段，然后在sort buffer中进行排序；用trace工具可以看到sort_mode信息里显示</p>
+<p><code>&lt; sort_key, additional_fields &gt;</code>或者<code>&lt; sort_key, packed_additional_fields &gt;</code></p>
+</li>
+<li><p>双路排序(又叫回表排序模式)：是首先根据相应的条件取出相应的排序字段和可以直接定位行数据的行 ID，然后在 sort buffer 中进行排序，排序完后需要再次取回其它需要的字段;用trace工具 可以看到sort_mode信息里显示<code>&lt; sort_key, rowid &gt;</code></p>
+</li>
+</ul>
+<p>MySQL 通过比较系统变量 max_length_for_sort_data(默认1024字节) 的大小和需要查询的字段总大小来判断使用哪种排序模式。</p>
+<p>如果字段的总长度小于max_length_for_sort_data ，那么使用 单路排序模式; 如果字段的总长度大于max_length_for_sort_data ，那么使用双路排序模式。</p>
+<h3 id="单路排序过程"><a href="#单路排序过程" class="headerlink" title="单路排序过程"></a><strong>单路排序过程</strong></h3><ol>
+<li><p>从索引name找到第一个满足 name = ‘LiLei’ 条件的主键 id</p>
+</li>
+<li><p>根据主键 id 取出整行，取出所有字段的值，存入 sort_buffer 中</p>
+</li>
+<li><p>从索引name找到下一个满足 name = ‘LiLei’ 条件的主键 id</p>
+</li>
+<li><p>重复步骤 2、3 直到不满足 name = ‘LiLei’</p>
+</li>
+<li><p>对 sort_buffer 中的数据按照字段 position 进行排序</p>
+</li>
+<li><p>返回结果给客户端</p>
+</li>
+</ol>
+<h3 id="双路排序过程"><a href="#双路排序过程" class="headerlink" title="双路排序过程:"></a>双路排序过程:</h3><ol>
+<li>从索引 name 找到第一个满足 name = ‘LiLei’ 的主键id</li>
+<li>根据主键 id 取出整行，把排序字段 position 和主键 id 这两个字段放到 sort buffer 中</li>
+<li>从索引 name 取下一个满足 name = ‘LiLei’ 记录的主键 id</li>
+<li>重复 3、4 直到不满足 name = ‘LiLei’</li>
+<li>对 sort_buffer 中的字段 position 和主键 id 按照字段 position 进行排序</li>
+<li>遍历排序好的 id 和字段 position，按照 id 的值回到原表中取出所有字段的值返回给客户端</li>
+</ol>
+<p>其实对比两个排序模式，<strong>单路排序会把所有需要查询的字段都放到 sort buffer 中</strong>，而<strong>双路排序只会把主键和需要排序的字段放到 sort buffer 中</strong>进行排序，然后再通过主键回到原表查询需要的字段。</p>
+<p>如果 MySQL 排序内存 sort_buffer 配置的比较小并且没有条件继续增加了，可以适当把 max_length_for_sort_data 配置小点，让优化器选择使用双路排序算法，可以在sort_buffer 中一次排序更多的行，只是需要再根据主键回到原表取数据。</p>
+<p>如果 MySQL 排序内存有条件可以配置比较大，可以适当增大 max_length_for_sort_data 的值，让优化器优先选择全字段排序(单路排序)，把需要的字段放到 sort_buffer 中，这样排序后就会直接从内存里返回查询结果了。</p>
+<p>所以，MySQL通过 max_length_for_sort_data 这个参数来控制排序，在不同场景使用不同的排序模式， 从而提升排序效率。</p>
+<p>注意，如果全部使用sort_buffer内存排序一般情况下效率会高于磁盘文件排序，但不能因为这个就随便增大sort_buffer(默认1M)，mysql很多参数设置都是做过优化的，不要轻易调整。</p>
+<h1 id="索引设计原则"><a href="#索引设计原则" class="headerlink" title="索引设计原则"></a>索引设计原则</h1><ol>
+<li><p>代码先行，索引后上<br> 一般等到主体业务功能开发完毕，把涉及到该表相关sql都要拿出来分析之后再建立索引。</p>
+</li>
+<li><p>联合索引尽量覆盖条件</p>
+<p>比如可以设计一个或者两三个联合索引(尽量少建单值索引)，让每一个联合索引都尽量去包含sql语句里的 where、order by、group by的字段，还要确保这些联合索引的字段顺序尽量满足sql查询的最左前缀原则</p>
+</li>
+<li><p>不要在小基数字段上建立索引 </p>
+<p>索引基数是指这个字段在表里总共有多少个不同的值，比如一张表总共100万行记录，其中有个性别字段， 其值不是男就是女，那么该字段的基数就是2。 如果对这种小基数字段建立索引的话，还不如全表扫描了，因为你的索引树里就包含男和女两种值，根本没法进行快速的二分查找，那用索引就没有太大的意义了。 一般建立索引，尽量使用那些基数比较大的字段，就是值比较多的字段，那么才能发挥出B+树快速二分查找的优势来</p>
+</li>
+<li><p>长字符串我们可以采用前缀索引</p>
+<p>尽量对字段类型较小的列设计索引，比如说什么tinyint之类的，因为字段类型较小的话，占用磁盘空间也会比较小，此时你在搜索的时候性能也会比较好一点。 当然，这个所谓的字段类型小一点的列，也不是绝对的，很多时候你就是要针对varchar(255)这种字段建立索引，哪怕多占用一些磁盘空间也是有必要的。 对于这种varchar(255)的大字段可能会比较占用磁盘空间，可以稍微优化下，比如针对这个字段的前20个字符建立索引，类似于 KEY <code>index(name(20),age,position)</code></p>
+<p>此时你在where条件里搜索的时候，如果是根据name字段来搜索，那么此时就会先到索引树里根据name 字段的前20个字符去搜索，定位到之后前20个字符的前缀匹配的部分数据之后，再回到聚簇索引提取出来完整的name字段值进行比对。<br>但是假如你要是order by name，那么此时你的name因为在索引树里仅仅包含了前20个字符，所以这个排序是没法用上索引的， group by也是同理。所以这里大家要对前缀索引有一个了解。</p>
+</li>
+<li><p>where与order by冲突时优先where</p>
+<p>一般这种时候往往都是让where条件去使用索引来快速筛选出来一部分指定的数据，接着再进行排序。 因为大多数情况基于索引进行where筛选往往可以最快速度筛选出你要的少部分数据，然后做排序的成本可能会小很多。</p>
+</li>
+<li><p>基于慢sql查询做优化</p>
+<p>可以根据监控后台的一些慢sql，针对这些慢sql查询做特定的索引优化。 </p>
+<p>关于慢sql查询不清楚的可以参考这篇文章:<a target="_blank" rel="noopener" href="https://blog.csdn.net/qq_40884473/article/details/89455740">https://blog.csdn.net/qq_40884473/article/details/89455740</a></p>
+</li>
+</ol>
+<h1 id="索引设计实战"><a href="#索引设计实战" class="headerlink" title="索引设计实战"></a>索引设计实战</h1><p>以社交场景APP来举例，我们一般会去搜索一些好友，这里面就涉及到对用户信息的筛选，这里肯定就是对用户user表搜索了.</p>
+<p>这个表一般来说数据量会比较大，我们先不考虑分库分表的情况，比如，我们一般会筛选地区(省市)，性别，年龄，身高，爱好之类的，有的APP可能用户还有评分，比如用户的受欢迎程度评分，我们可能还会根据评分来排序等等。 </p>
+<p>对于后台程序来说除了过滤用户的各种条件，还需要分页之类的处理，可能会生成类似sql语句执行: </p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">select</span> xx <span class="keyword">from</span> <span class="keyword">user</span> <span class="keyword">where</span> xx=xx <span class="keyword">and</span> xx=xx <span class="keyword">order</span> <span class="keyword">by</span> xx <span class="keyword">limit</span> xx,xx </span><br></pre></td></tr></table></figure>
+
+<p>对于这种情况如何合理设计索引了，比如用户可能经常会根据省市优先筛选同城的用户，还有根据性别去筛选，那我们是否应该设计一个联合索引 <code>(province,city,sex)</code> 。这些字段好像基数都不大，其实是应该的， 因为这些字段查询太频繁了。</p>
+<p>假设又有用户根据年龄范围去筛选了，比如</p>
+<figure class="highlight"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">where province=xx and city=xx and age&gt;=xx and age&lt;=xx</span><br></pre></td></tr></table></figure>
+
+<p>我们尝试着把age字段加入联合索引 <code>(province,city,sex,age)</code>，注意，一般这种范围查找的条件都要放在最后，之前讲过联合索引范围之后条件的是不能用索引的，但是对于当前这种情况依然用不到age 这个索引字段，因为用户没有筛选sex字段，那怎么优化了?</p>
+<p>其实我们可以这么来优化下sql的写法</p>
+<figure class="highlight"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">where province=xx and city=xx and sex in (&#x27;female&#x27;,&#x27;male&#x27;) and age&gt;=xx and age&lt;=xx </span><br></pre></td></tr></table></figure>
+
+<p>对于爱好之类的字段也可以类似sex字段处理，所以可以把爱好字段也加入索引 <code>(province,city,sex,hobby,age)</code> 假设可能还有一个筛选条件，比如要筛选最近一周登录过的用户，一般大家肯定希望跟活跃用户交友了，这样能尽快收到反馈，对应后台sql可能是这样:</p>
+<figure class="highlight"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">where province=xx and city=xx and sex in (&#x27;female&#x27;,&#x27;male&#x27;) and age&gt;=xx and age&lt;=xx and latest_login_time&gt;= xx</span><br></pre></td></tr></table></figure>
+
+<p>那我们是否能把 latest_login_time 字段也加入索引了?比如 <code>(province,city,sex,hobby,age,latest_login_time)</code> ，显然是不行的，那怎么来优化这种情况了?</p>
+<p>其实我们可以试着再设计一个字段<code>is_login_in_latest_7_days</code>，用户如果一周内有登录值就为1，否则为0，那么我们就可以把索引设计成 <code>(province,city,sex,hobby,is_login_in_latest_7_days,age)</code> 来满足上面那种场景了</p>
+<p>一般来说，通过这么一个多字段的索引是能够过滤掉绝大部分数据的，就保留小部分数据下来基于磁盘文件进行order by语句的排序，最后基于limit进行分页，那么一般性能还是比较高的。 不过有时可能用户会这么来查询，就查下受欢迎度较高的女性，比如</p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">where sex = &#x27;female&#x27; order by score limit xx,xx</span><br></pre></td></tr></table></figure>
+
+<p>那么上面那个索引是很难用上的，不能把太多的字段以及太多的值都用 in 语句拼接 到sql里的，那怎么办了?</p>
+<p>其实我们可以再设计一个辅助的联合索引，比如 (sex,score)，这样就能满足查询要求了。</p>
+<p> 以上就是一些索引设计的思路，核心思想就是，尽量利用一两个复杂的多字段联合索引，抗下80%以上的查询，然后用一两个辅助索引尽量抗下剩余的一些非典型查询，保证这种大数据量表的查询尽 可能多的都能充分利用索引，这样就能保证查询速度和性能.</p>
+<h1 id="分页查询优化"><a href="#分页查询优化" class="headerlink" title="分页查询优化"></a>分页查询优化</h1><p>很多时候我们业务系统实现分页功能可能会用如下sql实现</p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">select</span> * <span class="keyword">from</span> employees <span class="keyword">limit</span> <span class="number">10000</span>,<span class="number">10</span>;</span><br></pre></td></tr></table></figure>
+
+<p>表示从表 employees 中取出从 10001 行开始的 10 行记录。看似只查询了 10 条记录，实际这条 SQL 是先读取 10010 条记录，然后抛弃前 10000 条记录，然后读到后面 10 条想要的数据。因此要查询一张大表比较靠后的数据，执行效率是非常低的。</p>
+<ul>
+<li><p><strong>根据自增且连续的主键排序的分页查询</strong></p>
+<img src="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20211004000504.png" alt="image-20211004000504103" style="zoom:50%;" />
+
+<p>该 SQL 表示查询从第 90001开始的五行数据，没添加单独 order by，表示通过主键排序。我们再看表 employees ，因 为主键是自增    并且连续的，所以可以改写成按照主键去查询从第 90001开始的五行数据，如下:</p>
+<img src="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20211004000424.png" alt="image-20211004000424861" style="zoom:50%;" />
+
+<p>显然改写后的 SQL 走了索引，而且扫描的行数大大减少，执行效率更高。</p>
+<p><strong>但是，这条改写的SQL 在很多场景并不实用，因为表中可能某些记录被删后，主键空缺，导致结果不一致</strong></p>
+<p>这种改写得满 足以下两个条件:</p>
+<ol>
+<li>主键自增且连续</li>
+<li>结果是按照主键排序的</li>
+</ol>
+</li>
+</ul>
+<ul>
+<li><p>根据非主键字段排序的分页查询</p>
+<p><img src="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20211004001016.png" alt="image-20211004001016734"></p>
+<p>发现并没有使用 name 字段的索引(key 字段对应的值为 null)，</p>
+<p>具体原因：扫描整个索引并查找到没索引的行(可能要遍历多个索引树)的成本比扫描全表的成本更高，所以优化器放弃使用索引。</p>
+<p>优化：让排序时返回的字段尽可能少，所以可以让排序和分页操作先查出主键，然后根据主键查到对应的记录，</p>
+<p>SQL 改写如下</p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">select</span> * <span class="keyword">from</span> employees e <span class="keyword">inner</span> <span class="keyword">join</span> (<span class="keyword">select</span> <span class="keyword">id</span> <span class="keyword">from</span> employees <span class="keyword">order</span> <span class="keyword">by</span> <span class="keyword">name</span> <span class="keyword">limit</span> <span class="number">90000</span>,<span class="number">5</span>) ed <span class="keyword">on</span> e.id = ed.id;</span><br></pre></td></tr></table></figure>
+
+<p><img src="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20211004001500.png" alt="image-20211004001500651"></p>
+<p>原 SQL 使用的是 filesort 排序，而优化后的 SQL 使用的是索引排序。</p>
+</li>
+</ul>
+<h1 id="Join关联查询优化"><a href="#Join关联查询优化" class="headerlink" title="Join关联查询优化"></a>Join关联查询优化</h1><figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 示例表:</span></span><br><span class="line"><span class="keyword">CREATE</span> <span class="keyword">TABLE</span> <span class="string">`t1`</span> (</span><br><span class="line">	<span class="string">`id`</span> <span class="built_in">INT</span> ( <span class="number">11</span> ) <span class="keyword">NOT</span> <span class="literal">NULL</span> AUTO_INCREMENT,</span><br><span class="line">	<span class="string">`a`</span> <span class="built_in">INT</span> ( <span class="number">11</span> ) <span class="keyword">DEFAULT</span> <span class="literal">NULL</span>,</span><br><span class="line">	<span class="string">`b`</span> <span class="built_in">INT</span> ( <span class="number">11</span> ) <span class="keyword">DEFAULT</span> <span class="literal">NULL</span>,</span><br><span class="line">	PRIMARY <span class="keyword">KEY</span> ( <span class="string">`id`</span> ),</span><br><span class="line">	<span class="keyword">KEY</span> <span class="string">`idx_a`</span> ( <span class="string">`a`</span> ) </span><br><span class="line">) <span class="keyword">ENGINE</span> = <span class="keyword">INNODB</span> <span class="keyword">DEFAULT</span> <span class="keyword">CHARSET</span> = utf8;</span><br><span class="line"></span><br><span class="line"><span class="keyword">CREATE</span> <span class="keyword">TABLE</span> t2 <span class="keyword">LIKE</span> t1;</span><br><span class="line"></span><br><span class="line"><span class="comment"># 往t1表插入1万行记录</span></span><br><span class="line"><span class="keyword">DROP</span> <span class="keyword">PROCEDURE</span></span><br><span class="line"><span class="keyword">IF</span></span><br><span class="line">	<span class="keyword">EXISTS</span> insert_t1;</span><br><span class="line">	</span><br><span class="line">delimiter;;</span><br><span class="line"><span class="keyword">CREATE</span> <span class="keyword">PROCEDURE</span> insert_t1 () <span class="keyword">BEGIN</span></span><br><span class="line">	<span class="keyword">DECLARE</span></span><br><span class="line">		i <span class="built_in">INT</span>;</span><br><span class="line">	<span class="keyword">SET</span> i = <span class="number">1</span>;</span><br><span class="line">	WHILE</span><br><span class="line">			( i &lt;= 10000 ) DO</span><br><span class="line">			<span class="keyword">INSERT</span> <span class="keyword">INTO</span> t1 ( a, b )</span><br><span class="line">		<span class="keyword">VALUES</span></span><br><span class="line">			( i, i );</span><br><span class="line">		<span class="keyword">SET</span> i = i + <span class="number">1</span>;</span><br><span class="line">	<span class="keyword">END</span> <span class="keyword">WHILE</span>;</span><br><span class="line"><span class="keyword">END</span>;;</span><br><span class="line"></span><br><span class="line">delimiter;</span><br><span class="line"><span class="keyword">CALL</span> insert_t1 ();</span><br><span class="line"></span><br><span class="line"></span><br><span class="line"><span class="comment"># 往 t2表插入 100行记录</span></span><br><span class="line"><span class="keyword">DROP</span> <span class="keyword">PROCEDURE</span></span><br><span class="line"><span class="keyword">IF</span></span><br><span class="line">	<span class="keyword">EXISTS</span> insert_t2;</span><br><span class="line"></span><br><span class="line">delimiter;;</span><br><span class="line"><span class="keyword">CREATE</span> <span class="keyword">PROCEDURE</span> insert_t2 () <span class="keyword">BEGIN</span></span><br><span class="line">	<span class="keyword">DECLARE</span></span><br><span class="line">		i <span class="built_in">INT</span>;</span><br><span class="line">	<span class="keyword">SET</span> i = <span class="number">1</span>;</span><br><span class="line">	WHILE</span><br><span class="line">			( i &lt;= 100 ) DO</span><br><span class="line">			<span class="keyword">INSERT</span> <span class="keyword">INTO</span> t2 ( a, b )</span><br><span class="line">		<span class="keyword">VALUES</span></span><br><span class="line">			( i, i );</span><br><span class="line">		<span class="keyword">SET</span> i = i + <span class="number">1</span>;</span><br><span class="line">	<span class="keyword">END</span> <span class="keyword">WHILE</span>;</span><br><span class="line"><span class="keyword">END</span>;;</span><br><span class="line"></span><br><span class="line">delimiter;</span><br><span class="line"><span class="keyword">CALL</span> insert_t2 ();</span><br></pre></td></tr></table></figure>
+
+
+
+<p>mysql的表关联常见有两种算法</p>
+<ol>
+<li>Nested-Loop Join 算法</li>
+<li>Block Nested-Loop Join 算法</li>
+</ol>
+<h2 id="嵌套循环连接-Nested-Loop-Join-NLJ"><a href="#嵌套循环连接-Nested-Loop-Join-NLJ" class="headerlink" title="嵌套循环连接 Nested-Loop Join(NLJ)"></a>嵌套循环连接 Nested-Loop Join(NLJ)</h2><p>一次一行循环地从第一张表(称为驱动表)中读取行，在这行数据中取到关联字段，根据关联字段在另一张表(被驱动表)里取出满足条件的行，然后取出两张表的结果合集。</p>
+<p><img src="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20211004003455.png" alt="image-20211004003455650"></p>
+<p>从执行计划中可以看到这些信息:</p>
+<ul>
+<li><p>驱动表是 t2，被驱动表是 t1。先执行的就是驱动表(执行计划结果的id如果一样则按从上到下顺序执行sql);优化器一般会优先选择小表做驱动表。所以使用 inner join 时，排在前面的表并不一定就是驱动表。</p>
+</li>
+<li><p>当使用left join时，左表是驱动表，右表是被驱动表，当使用right join时，右表时驱动表，左表是被驱动表， 当使用join时，mysql会选择数据量比较小的表作为驱动表，大表作为被驱动表。</p>
+</li>
+<li><p>使用了 NLJ算法。一般 join 语句中，如果执行计划 Extra 中未出现 Using join buffer 则表示使用的 join 算法是 NLJ。</p>
+</li>
+</ul>
+<p>上面sql的大致流程如下:</p>
+<ol>
+<li>从表 t2 中读取一行数据(如果t2表有查询过滤条件的，会从过滤结果里取出一行数据); </li>
+<li>从第 1 步的数据中，取出关联字段 a，到表 t1 中查找;</li>
+<li>取出表 t1 中满足条件的行，跟 t2 中获取到的结果合并，作为结果返回给客户端;</li>
+<li>重复上面 3 步。</li>
+</ol>
+<p>整个过程会读取 t2 表的所有数据(扫描100行)，然后遍历这每行数据中字段 a 的值，根据 t2 表中 a 的值索引扫描 t1 表 中的对应行(扫描100次 t1 表的索引，1次扫描可以认为最终只扫描 t1 表一行完整数据，也就是总共 t1 表也扫描了100 行)。因此整个过程扫描了 200 行。 如果被驱动表的关联字段没索引，使用NLJ算法性能会比较低，mysql会选择Block Nested-Loop Join 算法。</p>
+<h2 id="基于块的嵌套循环连接-Block-Nested-Loop-Join-BNL"><a href="#基于块的嵌套循环连接-Block-Nested-Loop-Join-BNL" class="headerlink" title="基于块的嵌套循环连接 Block Nested-Loop Join(BNL)"></a>基于块的嵌套循环连接 Block Nested-Loop Join(BNL)</h2><p>把驱动表的数据读入到 join_buffer 中，然后扫描被驱动表，把被驱动表每一行取出来跟 join_buffer 中的数据做对比。</p>
+<p><img src="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20211004153011.png" alt="image-20211004153011306"></p>
+<p>Extra 中 的Using join buffer (Block Nested Loop)说明该关联查询使用的是 BNL 算法。</p>
+<p>上面sql的大致流程如下:</p>
+<ol>
+<li>把 t2 的所有数据放入到 join_buffer 中</li>
+<li>把表 t1 中每一行取出来，跟 join_buffer 中的数据做对比 </li>
+<li>返回满足 join 条件的数据</li>
+</ol>
+<p>整个过程对表 t1 和 t2 都做了一次全表扫描，因此扫描的总行数为10000(表 t1 的数据总量) + 100(表 t2 的数据总量) = 10100。并且 join_buffer 里的数据是无序的，因此对表 t1 中的每一行，都要做 100 次判断，所以内存中的判断次数是 100 * 10000= 100 万次。<br>这个例子里表 t2 才 100 行，要是表 t2 是一个大表，join_buffer 放不下怎么办呢?</p>
+<p>join_buffer 的大小是由参数 join_buffer_size 设定的，默认值是 256k。如果放不下表 t2 的所有数据话，策略很简单， 就是分段放。<br>比如 t2 表有1000行记录， join_buffer 一次只能放800行数据，那么执行过程就是先往 join_buffer 里放800行记录，然 后从 t1 表里取数据跟 join_buffer 中数据对比得到部分结果，然后清空 join_buffer ，再放入 t2 表剩余200行记录，再从 t1 表里取数据跟 join_buffer 中数据对比。所以就多扫了一次 t1 表。</p>
+<p><strong>被驱动表的关联字段没索引为什么要选择使用 BNL 算法而不使用 Nested-Loop Join 呢?</strong><br>如果上面第二条sql使用 Nested-Loop Join，那么扫描行数为 100 * 10000 = 100万次，这个是磁盘扫描。 很显然，用BNL磁盘扫描次数少很多，相比于磁盘扫描，BNL的内存计算会快得多。 <strong>因此MySQL对于被驱动表的关联字段没索引的关联查询，一般都会使用 BNL 算法。如果有索引一般选择 NLJ 算法，有 索引的情况下 NLJ 算法比 BNL算法性能更高</strong></p>
+<h1 id="关联sql优化"><a href="#关联sql优化" class="headerlink" title="关联sql优化"></a>关联sql优化</h1><ul>
+<li>关联字段加索引，让mysql做join操作时尽量选择NLJ算法</li>
+<li>小表驱动大表，写多表连接sql时如果明确知道哪张表是小表可以用straight_join写法固定连接驱动方式，省去mysql优化器自己判断的时间</li>
+</ul>
+<blockquote>
+<p>straight_join功能同join类似，但能让左边的表来驱动右边的表，能改表优化器对于联表查询的执行顺序。<br>比如:select * from t2 straight_join t1 on t2.a = t1.a; 代表指定mysql选 t2 表作为驱动表。</p>
+</blockquote>
+<ul>
+<li><p>straight_join只适用于inner join，并不适用于left join，right join。(因为left join，right join已经代表指 定了表的执行顺序)</p>
+</li>
+<li><p>尽可能让优化器去判断，因为大部分情况下mysql优化器是比人要聪明的。使用straight_join一定要慎重，因为部分情况下人为指定的执行顺序并不一定会比优化引擎要靠谱。</p>
+</li>
+</ul>
+<p><strong>对于小表定义的明确</strong><br>在决定哪个表做驱动表的时候，应该是两个表按照各自的条件过滤，过滤完成之后，计算参与 join 的各个字段的总数据量，数据量小的那个表，就是“小表”，应该作为驱动表。</p>
+<h1 id="in和exsits优化"><a href="#in和exsits优化" class="headerlink" title="in和exsits优化"></a>in和exsits优化</h1><p>原则:<strong>小表驱动大表</strong>，即小的数据集驱动大的数据集</p>
+<h2 id="in"><a href="#in" class="headerlink" title="in"></a>in</h2><p>当B表的数据集小于A表的数据集时，in优于exists</p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">select</span> * <span class="keyword">from</span> A <span class="keyword">where</span> <span class="keyword">id</span> <span class="keyword">in</span> (<span class="keyword">select</span> <span class="keyword">id</span> <span class="keyword">from</span> B)</span><br><span class="line"></span><br><span class="line"><span class="comment">#等价于:</span></span><br><span class="line"><span class="keyword">for</span> (<span class="keyword">select</span> <span class="keyword">id</span> <span class="keyword">from</span> B)&#123;</span><br><span class="line">	<span class="keyword">select</span> * <span class="keyword">from</span> A <span class="keyword">where</span> A.id = B.id</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<h2 id="exists"><a href="#exists" class="headerlink" title="exists"></a>exists</h2><p>当A表的数据集小于B表的数据集时，exists优于in </p>
+<p>将主查询A的数据，放到子查询B中做条件验证，根据验证结果(true或false)来决定主查询的数据是否保留</p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">select</span> * <span class="keyword">from</span> A <span class="keyword">where</span> <span class="keyword">exists</span> (<span class="keyword">select</span> <span class="number">1</span> <span class="keyword">from</span> B <span class="keyword">where</span> B.id = A.id) </span><br><span class="line"></span><br><span class="line"><span class="comment">#等价于:</span></span><br><span class="line"><span class="keyword">for</span>(<span class="keyword">select</span> * <span class="keyword">from</span> A)&#123;</span><br><span class="line"> <span class="keyword">select</span> * <span class="keyword">from</span> B <span class="keyword">where</span> B.id = A.id</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">#A表与B表的ID字段应建立索引</span></span><br></pre></td></tr></table></figure>
+
+<ul>
+<li>EXISTS (subquery)只返回TRUE或FALSE,因此子查询中的SELECT * 也可以用SELECT 1替换,官方说法是实际执行时会忽略SELECT清单,因此没有区别</li>
+<li>EXISTS子查询的实际执行过程可能经过了优化而不是我们理解上的逐条对比</li>
+<li>EXISTS子查询往往也可以用JOIN来代替，何种最优需要具体问题具体分析</li>
+</ul>
+<h1 id="count-查询优化"><a href="#count-查询优化" class="headerlink" title="count(*)查询优化"></a>count(*)查询优化</h1><figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">‐‐ 临时关闭mysql查询缓存，为了查看sql多次执行的真实时间</span><br><span class="line"><span class="keyword">set</span> <span class="keyword">global</span> query_cache_size=<span class="number">0</span>;</span><br><span class="line"><span class="keyword">set</span> <span class="keyword">global</span> query_cache_type=<span class="number">0</span>;</span><br><span class="line"></span><br><span class="line"><span class="keyword">EXPLAIN</span> <span class="keyword">select</span> <span class="keyword">count</span>(<span class="number">1</span>) <span class="keyword">from</span> employees;</span><br><span class="line"><span class="keyword">EXPLAIN</span> <span class="keyword">select</span> <span class="keyword">count</span>(<span class="keyword">id</span>) <span class="keyword">from</span> employees;</span><br><span class="line"><span class="keyword">EXPLAIN</span> <span class="keyword">select</span> <span class="keyword">count</span>(<span class="keyword">name</span>) <span class="keyword">from</span> employees;</span><br><span class="line"><span class="keyword">EXPLAIN</span> <span class="keyword">select</span> <span class="keyword">count</span>(*) <span class="keyword">from</span> employees;</span><br></pre></td></tr></table></figure>
+
+<p>注意:以上4条sql只有根据某个字段count不会统计字段为null值的数据行</p>
+<p>四个sql的执行计划一样，说明这四个sql执行效率应该差不多</p>
+<ul>
+<li><p>字段有索引</p>
+<p>count(*<em>)≈count(1 ) &gt; count(字段) &gt; count(主键 id)</em></p>
+<p> 字段有索引，count(字段)统计走二级索引，二级索引存储数据比主键索引少，所以count(字段)&gt;count(主键 id)</p>
+</li>
+<li><p>字段无索引</p>
+<p>count(*)≈count(1) &gt; count(主键 id) &gt; count(字段) </p>
+<p>字段没有索引count(字段)统计走不了索引， count(主键 id)还可以走主键索引，所以count(主键 id) &gt; count(字段)</p>
+<p>count(1)跟count(字段)执行过程类似，不过count(1)不需要取出字段统计，就用常量1做统计，count(字段)还需要取出字段，所以理论上count(1)比count(字段)会快一点。</p>
+<p>count(<em>) 是例外，mysql并不会把全部字段取出来，而是专门做了优化，不取值，按行累加，效率很高，所以不需要用 count(列名)或count(常量)来替代 count(</em>)。 </p>
+<p>为什么对于count(id)，mysql最终选择辅助索引而不是主键聚集索引?因为二级索引相对主键索引存储数据更少，检索性能应该更高，mysql内部做了点优化(应该是在5.7版本才优化)。</p>
+</li>
+</ul>
+
+      
+    </div>
+    <div class="article-footer">
+      <blockquote class="mt-2x">
+  <ul class="post-copyright list-unstyled">
+    
+    <li class="post-copyright-link hidden-xs">
+      <strong>本文链接：</strong>
+      <a href="https://tj-ever.github.io/2021/10/03/MySQL%20%E7%B4%A2%E5%BC%95%E4%BC%98%E5%8C%96/" title="MySQL 索引优化" target="_blank" rel="external">https://tj-ever.github.io/2021/10/03/MySQL 索引优化/</a>
+    </li>
+    
+    <li class="post-copyright-license">
+      <strong>版权声明： </strong> 本博客所有文章除特别声明外，均采用 <a href="http://creativecommons.org/licenses/by/4.0/deed.zh" target="_blank" rel="external">CC BY 4.0 CN协议</a> 许可协议。转载请注明出处！
+    </li>
+  </ul>
+</blockquote>
+
+
+<div class="panel panel-default panel-badger">
+  <div class="panel-body">
+    <figure class="media">
+      <div class="media-left">
+        <a href="https://github.com/cofess" target="_blank" class="img-burn thumb-sm visible-lg">
+          <img src="/images/avatar.jpg" class="img-rounded w-full" alt="">
+        </a>
+      </div>
+      <div class="media-body">
+        <h3 class="media-heading"><a href="https://github.com/cofess" target="_blank"><span class="text-dark">Ever</span><small class="ml-1x">Ever的个人博客</small></a></h3>
+        <div>啊啊啊啊这功能做不了。</div>
+      </div>
+    </figure>
+  </div>
+</div>
+
+
+    </div>
+  </article>
+  
+    
+  <section id="comments">
+  	
+      <div id="vcomments"></div>
+    
+  </section>
+
+
+  
+</div>
+
+  <nav class="bar bar-footer clearfix" data-stick-bottom>
+  <div class="bar-inner">
+  
+  <ul class="pager pull-left">
+    
+    <li class="prev">
+      <a href="/2021/10/04/MySQL%20%E4%BA%8B%E5%8A%A1%E5%8F%8A%E9%94%81%E6%9C%BA%E5%88%B6/" title="MySQL 事务及锁机制"><i class="icon icon-angle-left" aria-hidden="true"></i><span>&nbsp;&nbsp;上一篇</span></a>
+    </li>
+    
+    
+    <li class="next">
+      <a href="/2021/09/29/MySQL%20%E5%86%85%E9%83%A8%E7%BB%93%E6%9E%84%20BinLog/" title="MySQL 内部结构 BinLog"><span>下一篇&nbsp;&nbsp;</span><i class="icon icon-angle-right" aria-hidden="true"></i></a>
+    </li>
+    
+    
+  </ul>
+  
+  
+  <!-- Button trigger modal -->
+  <button type="button" class="btn btn-fancy btn-donate pop-onhover bg-gradient-warning" data-toggle="modal" data-target="#donateModal"><span>赏</span></button>
+  <!-- <div class="wave-icon wave-icon-danger btn-donate" data-toggle="modal" data-target="#donateModal">
+    <div class="wave-circle"><span class="icon"><i class="icon icon-bill"></i></span></div>
+  </div> -->
+  
+  
+  <div class="bar-right">
+    
+    <div class="share-component" data-sites="weibo,qq,wechat,facebook,twitter" data-mobile-sites="weibo,qq,qzone"></div>
+    
+  </div>
+  </div>
+</nav>
+  
+<!-- Modal -->
+<div class="modal modal-center modal-small modal-xs-full fade" id="donateModal" tabindex="-1" role="dialog">
+  <div class="modal-dialog" role="document">
+    <div class="modal-content donate">
+      <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+      <div class="modal-body">
+        <div class="donate-box">
+          <div class="donate-head">
+            <p>感谢您的支持，我会继续努力的!</p>
+          </div>
+          <div class="tab-content">
+            <div role="tabpanel" class="tab-pane fade active in" id="alipay">
+              <div class="donate-payimg">
+                <img src="/images/donate/alipayimg.png" alt="扫码支持" title="扫一扫" />
+              </div>
+              <p class="text-muted mv">扫码打赏，你说多少就多少</p>
+              <p class="text-grey">打开支付宝扫一扫，即可进行扫码打赏哦</p>
+            </div>
+            <div role="tabpanel" class="tab-pane fade" id="wechatpay">
+              <div class="donate-payimg">
+                <img src="/images/donate/wechatpayimg.png" alt="扫码支持" title="扫一扫" />
+              </div>
+              <p class="text-muted mv">扫码打赏，你说多少就多少</p>
+              <p class="text-grey">打开微信扫一扫，即可进行扫码打赏哦</p>
+            </div>
+          </div>
+          <div class="donate-footer">
+            <ul class="nav nav-tabs nav-justified" role="tablist">
+              <li role="presentation" class="active">
+                <a href="#alipay" id="alipay-tab" role="tab" data-toggle="tab" aria-controls="alipay" aria-expanded="true"><i class="icon icon-alipay"></i> 支付宝</a>
+              </li>
+              <li role="presentation" class="">
+                <a href="#wechatpay" role="tab" id="wechatpay-tab" data-toggle="tab" aria-controls="wechatpay" aria-expanded="false"><i class="icon icon-wepay"></i> 微信支付</a>
+              </li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+
+</main>
+
+  <footer class="footer" itemscope itemtype="http://schema.org/WPFooter">
+	
+	
+    <ul class="social-links">
+    	
+        <li><a href="https://weibo.com/u/2735829887" target="_blank" title="Weibo" data-toggle=tooltip data-placement=top><i class="icon icon-weibo"></i></a></li>
+        
+    </ul>
+
+    <div class="copyright">
+    	
+        <div class="publishby">
+        	Theme by <a href="https://github.com/cofess" target="_blank"> cofess </a>base on <a href="https://github.com/cofess/hexo-theme-pure" target="_blank">pure</a>.
+        </div>
+    </div>
+</footer>
+  <script src="//cdn.jsdelivr.net/npm/jquery@1.12.4/dist/jquery.min.js"></script>
+<script>
+window.jQuery || document.write('<script src="js/jquery.min.js"><\/script>')
+</script>
+
+<script src="/js/plugin.min.js"></script>
+
+
+<script src="/js/application.js"></script>
+
+
+    <script>
+(function (window) {
+    var INSIGHT_CONFIG = {
+        TRANSLATION: {
+            POSTS: '文章',
+            PAGES: '页面',
+            CATEGORIES: '分类',
+            TAGS: '标签',
+            UNTITLED: '(未命名)',
+        },
+        ROOT_URL: '/',
+        CONTENT_URL: '/content.json',
+    };
+    window.INSIGHT_CONFIG = INSIGHT_CONFIG;
+})(window);
+</script>
+
+<script src="/js/insight.js"></script>
+
+
+
+
+
+
+   
+
+
+
+
+   
+    
+  <script src="//cdn1.lncld.net/static/js/3.0.4/av-min.js"></script>
+  <script src="//cdn.jsdelivr.net/npm/valine"></script>
+  <script type="text/javascript">
+  var GUEST = ['nick', 'mail', 'link'];
+  var meta = 'nick,mail,link';
+  meta = meta.split(',').filter(function(item) {
+    return GUEST.indexOf(item) > -1;
+  });
+  new Valine({
+    el: '#vcomments',
+    verify: false,
+    notify: false,
+    appId: '',
+    appKey: '',
+    placeholder: 'Just go go',
+    avatar: 'mm',
+    meta: meta,
+    pageSize: '10' || 10,
+    visitor: false
+  });
+  </script>
+
+     
+
+
+
+
+
+
+
+</body>
+</html>

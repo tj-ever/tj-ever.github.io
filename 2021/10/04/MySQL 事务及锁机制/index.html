@@ -1,0 +1,852 @@
+<!DOCTYPE html>
+<html lang=zh>
+<head>
+  <meta charset="utf-8">
+  
+  <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no, minimal-ui">
+  <meta name="renderer" content="webkit">
+  <meta http-equiv="Cache-Control" content="no-transform" />
+  <meta http-equiv="Cache-Control" content="no-siteapp" />
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <meta name="format-detection" content="telephone=no,email=no,adress=no">
+  <!-- Color theme for statusbar -->
+  <meta name="theme-color" content="#000000" />
+  <!-- 强制页面在当前窗口以独立页面显示,防止别人在框架里调用页面 -->
+  <meta http-equiv="window-target" content="_top" />
+  
+  
+  <title>MySQL 事务及锁机制 | Ever的个人博客</title>
+  <meta name="description" content="概述数据库一般都会并发执行多个事务，多个事务可能会并发的对相同的一批数据进行增删改查操作，可能就会导致脏写、脏读、不可重复读、幻读这些问题。 这些问题的本质都是数据库的多事务并发问题，为了解决多事务并发问题，数据库设计了事务隔离机制、锁机制、MVCC多版本并发控制隔离机制，用一整套机制来解决多事务并发问题。 事务及其ACID属性事务是由一组SQL语句组成的逻辑处理单元,事务具有以下4个属性,通常简">
+<meta property="og:type" content="article">
+<meta property="og:title" content="MySQL 事务及锁机制">
+<meta property="og:url" content="https://tj-ever.github.io/2021/10/04/MySQL%20%E4%BA%8B%E5%8A%A1%E5%8F%8A%E9%94%81%E6%9C%BA%E5%88%B6/index.html">
+<meta property="og:site_name" content="Ever的个人博客">
+<meta property="og:description" content="概述数据库一般都会并发执行多个事务，多个事务可能会并发的对相同的一批数据进行增删改查操作，可能就会导致脏写、脏读、不可重复读、幻读这些问题。 这些问题的本质都是数据库的多事务并发问题，为了解决多事务并发问题，数据库设计了事务隔离机制、锁机制、MVCC多版本并发控制隔离机制，用一整套机制来解决多事务并发问题。 事务及其ACID属性事务是由一组SQL语句组成的逻辑处理单元,事务具有以下4个属性,通常简">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20211004171656.png">
+<meta property="og:image" content="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20211004192720.png">
+<meta property="og:image" content="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20211004192852.png">
+<meta property="og:image" content="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20211004200234.png">
+<meta property="og:image" content="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20211004201606.png">
+<meta property="og:image" content="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20211004215749.png">
+<meta property="og:image" content="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20211004202032.png">
+<meta property="og:image" content="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20211004202755.png">
+<meta property="og:image" content="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20211004202839.png">
+<meta property="og:image" content="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20211004203640.png">
+<meta property="og:image" content="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20211004203847.png">
+<meta property="og:image" content="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20211004204041.png">
+<meta property="og:image" content="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20211004205431.png">
+<meta property="og:image" content="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20211004205644.png">
+<meta property="og:image" content="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20211004210652.png">
+<meta property="og:image" content="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20211004210755.png">
+<meta property="og:image" content="https://tj-ever.github.io/Users/tianjie/Library/Application%20Support/typora-user-images/image-20211004211124147.png">
+<meta property="og:image" content="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20211004211848.png">
+<meta property="og:image" content="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20211004212129.png">
+<meta property="og:image" content="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20211004212209.png">
+<meta property="og:image" content="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20211004212337.png">
+<meta property="og:image" content="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20211004213028.png">
+<meta property="og:image" content="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20211004213330.png">
+<meta property="og:image" content="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20211004213414.png">
+<meta property="og:image" content="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20211004213522.png">
+<meta property="article:published_time" content="2021-10-03T16:00:00.000Z">
+<meta property="article:modified_time" content="2021-10-04T13:57:54.221Z">
+<meta property="article:author" content="Ever">
+<meta property="article:tag" content="MySQL">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20211004171656.png">
+  <!-- Canonical links -->
+  <link rel="canonical" href="https://tj-ever.github.io/2021/10/04/MySQL%20%E4%BA%8B%E5%8A%A1%E5%8F%8A%E9%94%81%E6%9C%BA%E5%88%B6/index.html">
+  
+    <link rel="alternate" href="/atom.xml" title="Ever的个人博客" type="application/atom+xml">
+  
+  
+    <link rel="icon" href="/favicon.png" type="image/x-icon">
+  
+  
+<link rel="stylesheet" href="/css/style.css">
+
+  
+  
+  
+  
+<meta name="generator" content="Hexo 5.2.0"></head>
+
+
+<body class="main-center" itemscope itemtype="http://schema.org/WebPage">
+  <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+  <div class="slimContent">
+    <div class="navbar-header">
+      
+      
+      <div class="profile-block text-center">
+        <a id="avatar" href="https://github.com/cofess" target="_blank">
+          <img class="img-circle img-rotate" src="/images/avatar.jpg" width="200" height="200">
+        </a>
+        <h2 id="name" class="hidden-xs hidden-sm">Ever</h2>
+        <h3 id="title" class="hidden-xs hidden-sm hidden-md">Ever的个人博客</h3>
+        <small id="location" class="text-muted hidden-xs hidden-sm"><i class="icon icon-map-marker"></i> Xian, China</small>
+      </div>
+      
+      <div class="search" id="search-form-wrap">
+
+    <form class="search-form sidebar-form">
+        <div class="input-group">
+            <input type="text" class="search-form-input form-control" placeholder="搜索" />
+            <span class="input-group-btn">
+                <button type="submit" class="search-form-submit btn btn-flat" onclick="return false;"><i class="icon icon-search"></i></button>
+            </span>
+        </div>
+    </form>
+    <div class="ins-search">
+  <div class="ins-search-mask"></div>
+  <div class="ins-search-container">
+    <div class="ins-input-wrapper">
+      <input type="text" class="ins-search-input" placeholder="想要查找什么..." x-webkit-speech />
+      <button type="button" class="close ins-close ins-selectable" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">×</span></button>
+    </div>
+    <div class="ins-section-wrapper">
+      <div class="ins-section-container"></div>
+    </div>
+  </div>
+</div>
+
+
+</div>
+      <button class="navbar-toggle collapsed" type="button" data-toggle="collapse" data-target="#main-navbar" aria-controls="main-navbar" aria-expanded="false">
+        <span class="sr-only">Toggle navigation</span>
+        <span class="icon-bar"></span>
+        <span class="icon-bar"></span>
+        <span class="icon-bar"></span>
+      </button>
+    </div>
+    <nav id="main-navbar" class="collapse navbar-collapse" itemscope itemtype="http://schema.org/SiteNavigationElement" role="navigation">
+      <ul class="nav navbar-nav main-nav ">
+        
+        
+        <li class="menu-item menu-item-home">
+          <a href="/.">
+            
+            <i class="icon icon-home-fill"></i>
+            
+            <span class="menu-title">首页</span>
+          </a>
+        </li>
+        
+        
+        <li class="menu-item menu-item-archives">
+          <a href="/archives">
+            
+            <i class="icon icon-archives-fill"></i>
+            
+            <span class="menu-title">归档</span>
+          </a>
+        </li>
+        
+        
+        <li class="menu-item menu-item-categories">
+          <a href="/categories">
+            
+            <i class="icon icon-folder"></i>
+            
+            <span class="menu-title">分类</span>
+          </a>
+        </li>
+        
+        
+        <li class="menu-item menu-item-tags">
+          <a href="/tags">
+            
+            <i class="icon icon-tags"></i>
+            
+            <span class="menu-title">标签</span>
+          </a>
+        </li>
+        
+        
+        <li class="menu-item menu-item-repository">
+          <a href="/repository">
+            
+            <i class="icon icon-project"></i>
+            
+            <span class="menu-title">项目</span>
+          </a>
+        </li>
+        
+        
+        <li class="menu-item menu-item-books">
+          <a href="/books">
+            
+            <i class="icon icon-book-fill"></i>
+            
+            <span class="menu-title">书单</span>
+          </a>
+        </li>
+        
+        
+        <li class="menu-item menu-item-links">
+          <a href="/links">
+            
+            <i class="icon icon-friendship"></i>
+            
+            <span class="menu-title">友链</span>
+          </a>
+        </li>
+        
+        
+        <li class="menu-item menu-item-about">
+          <a href="/about">
+            
+            <i class="icon icon-cup-fill"></i>
+            
+            <span class="menu-title">关于</span>
+          </a>
+        </li>
+        
+      </ul>
+      
+	
+    <ul class="social-links">
+    	
+        <li><a href="https://weibo.com/u/2735829887" target="_blank" title="Weibo" data-toggle=tooltip data-placement=top><i class="icon icon-weibo"></i></a></li>
+        
+    </ul>
+
+    </nav>
+  </div>
+</header>
+
+  
+    <aside class="sidebar" itemscope itemtype="http://schema.org/WPSideBar">
+  <div class="slimContent">
+    
+      <div class="widget">
+    <h3 class="widget-title">公告</h3>
+    <div class="widget-body">
+        <div id="board">
+            <div class="content">
+                <p>qq:&nbsp471958719</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+    
+      
+
+    
+      
+  <div class="widget">
+    <h3 class="widget-title">标签</h3>
+    <div class="widget-body">
+      <ul class="tag-list" itemprop="keywords"><li class="tag-list-item"><a class="tag-list-link" href="/tags/JVM/" rel="tag">JVM</a><span class="tag-list-count">4</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/JVM-Arthas/" rel="tag">JVM Arthas</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/MySQL/" rel="tag">MySQL</a><span class="tag-list-count">5</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Zookeeper/" rel="tag">Zookeeper</a><span class="tag-list-count">3</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/docker/" rel="tag">docker</a><span class="tag-list-count">3</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/hashmap/" rel="tag">hashmap</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/k8s/" rel="tag">k8s</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/linux/" rel="tag">linux</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/oracle/" rel="tag">oracle</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/rabbitmq/" rel="tag">rabbitmq</a><span class="tag-list-count">3</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/redis/" rel="tag">redis</a><span class="tag-list-count">3</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/sql/" rel="tag">sql</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E5%89%8D%E7%AB%AF/" rel="tag">前端</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E5%B9%B6%E5%8F%91%E7%BC%96%E7%A8%8B/" rel="tag">并发编程</a><span class="tag-list-count">7</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E7%8E%AF%E5%A2%83%E6%90%AD%E5%BB%BA/" rel="tag">环境搭建</a><span class="tag-list-count">1</span></li></ul>
+    </div>
+  </div>
+
+
+    
+      
+  <div class="widget">
+    <h3 class="widget-title">标签云</h3>
+    <div class="widget-body tagcloud">
+      <a href="/tags/JVM/" style="font-size: 13.5px;">JVM</a> <a href="/tags/JVM-Arthas/" style="font-size: 13px;">JVM Arthas</a> <a href="/tags/MySQL/" style="font-size: 13.75px;">MySQL</a> <a href="/tags/Zookeeper/" style="font-size: 13.25px;">Zookeeper</a> <a href="/tags/docker/" style="font-size: 13.25px;">docker</a> <a href="/tags/hashmap/" style="font-size: 13px;">hashmap</a> <a href="/tags/k8s/" style="font-size: 13px;">k8s</a> <a href="/tags/linux/" style="font-size: 13px;">linux</a> <a href="/tags/oracle/" style="font-size: 13px;">oracle</a> <a href="/tags/rabbitmq/" style="font-size: 13.25px;">rabbitmq</a> <a href="/tags/redis/" style="font-size: 13.25px;">redis</a> <a href="/tags/sql/" style="font-size: 13px;">sql</a> <a href="/tags/%E5%89%8D%E7%AB%AF/" style="font-size: 13px;">前端</a> <a href="/tags/%E5%B9%B6%E5%8F%91%E7%BC%96%E7%A8%8B/" style="font-size: 14px;">并发编程</a> <a href="/tags/%E7%8E%AF%E5%A2%83%E6%90%AD%E5%BB%BA/" style="font-size: 13px;">环境搭建</a>
+    </div>
+  </div>
+
+    
+      
+  <div class="widget">
+    <h3 class="widget-title">归档</h3>
+    <div class="widget-body">
+      <ul class="archive-list"><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/11/">十一月 2021</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/10/">十月 2021</a><span class="archive-list-count">8</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/09/">九月 2021</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/08/">八月 2021</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/07/">七月 2021</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/06/">六月 2021</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/12/">十二月 2020</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/11/">十一月 2020</a><span class="archive-list-count">6</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/10/">十月 2020</a><span class="archive-list-count">5</span></li></ul>
+    </div>
+  </div>
+
+
+    
+      
+  <div class="widget">
+    <h3 class="widget-title">最新文章</h3>
+    <div class="widget-body">
+      <ul class="recent-post-list list-unstyled no-thumbnail">
+        
+          <li>
+            
+            <div class="item-inner">
+              <p class="item-category">
+                
+              </p>
+              <p class="item-title">
+                <a href="/2021/11/01/Rabbitmq%E5%AE%9E%E7%8E%B0%E6%B6%88%E6%81%AF%E5%8F%AF%E9%9D%A0%E6%80%A7%E6%8A%95%E9%80%92/" class="title">Rabbitmq 消息可靠性投递两种方案</a>
+              </p>
+              <p class="item-date">
+                <time datetime="2021-10-31T16:00:00.000Z" itemprop="datePublished">2021-11-01</time>
+              </p>
+            </div>
+          </li>
+          
+          <li>
+            
+            <div class="item-inner">
+              <p class="item-category">
+                
+              </p>
+              <p class="item-title">
+                <a href="/2021/10/25/Rabbitmq%20%E9%AB%98%E7%BA%A7%E7%89%B9%E6%80%A7%E5%8F%8A%E6%95%B4%E5%90%88springboot/" class="title">Rabbitmq 高级特性及整合springboot</a>
+              </p>
+              <p class="item-date">
+                <time datetime="2021-10-24T16:00:00.000Z" itemprop="datePublished">2021-10-25</time>
+              </p>
+            </div>
+          </li>
+          
+          <li>
+            
+            <div class="item-inner">
+              <p class="item-category">
+                
+              </p>
+              <p class="item-title">
+                <a href="/2021/10/22/Rabbitmq%20%E7%8E%AF%E5%A2%83%E6%90%AD%E5%BB%BA%E5%8F%8A%E5%9F%BA%E6%9C%AC%E4%BD%BF%E7%94%A8/" class="title">Rabbitmq 环境搭建及基本使用</a>
+              </p>
+              <p class="item-date">
+                <time datetime="2021-10-21T16:00:00.000Z" itemprop="datePublished">2021-10-22</time>
+              </p>
+            </div>
+          </li>
+          
+          <li>
+            
+            <div class="item-inner">
+              <p class="item-category">
+                
+              </p>
+              <p class="item-title">
+                <a href="/2021/10/21/zookeeper%20leader/" class="title">Zookeeper 源码构建 阅读</a>
+              </p>
+              <p class="item-date">
+                <time datetime="2021-10-20T16:00:00.000Z" itemprop="datePublished">2021-10-21</time>
+              </p>
+            </div>
+          </li>
+          
+          <li>
+            
+            <div class="item-inner">
+              <p class="item-category">
+                
+              </p>
+              <p class="item-title">
+                <a href="/2021/10/07/Zookeeper%20%E5%AE%A2%E6%88%B7%E7%AB%AF%E4%BD%BF%E7%94%A8%E5%8F%8A%E9%9B%86%E7%BE%A4/" class="title">Zookeeper 客户端使用及集群</a>
+              </p>
+              <p class="item-date">
+                <time datetime="2021-10-06T16:00:00.000Z" itemprop="datePublished">2021-10-07</time>
+              </p>
+            </div>
+          </li>
+          
+      </ul>
+    </div>
+  </div>
+  
+
+    
+  </div>
+</aside>
+
+  
+  
+<main class="main" role="main">
+  <div class="content">
+  <article id="post-MySQL 事务及锁机制" class="article article-type-post" itemscope itemtype="http://schema.org/BlogPosting">
+    
+    <div class="article-header">
+      
+        
+  
+    <h1 class="article-title" itemprop="name">
+      MySQL 事务及锁机制
+    </h1>
+  
+
+      
+      <div class="article-meta">
+        <span class="article-date">
+    <i class="icon icon-calendar-check"></i>
+	<a href="/2021/10/04/MySQL%20%E4%BA%8B%E5%8A%A1%E5%8F%8A%E9%94%81%E6%9C%BA%E5%88%B6/" class="article-date">
+	  <time datetime="2021-10-03T16:00:00.000Z" itemprop="datePublished">2021-10-04</time>
+	</a>
+</span>
+        
+        
+  <span class="article-tag">
+    <i class="icon icon-tags"></i>
+	<a class="article-tag-link-link" href="/tags/MySQL/" rel="tag">MySQL</a>
+  </span>
+
+
+        
+
+        <span class="post-comment"><i class="icon icon-comment"></i> <a href="/2021/10/04/MySQL%20%E4%BA%8B%E5%8A%A1%E5%8F%8A%E9%94%81%E6%9C%BA%E5%88%B6/#comments" class="article-comment-link">评论</a></span>
+        
+      </div>
+    </div>
+    <div class="article-entry marked-body" itemprop="articleBody">
+      
+        <h1 id="概述"><a href="#概述" class="headerlink" title="概述"></a>概述</h1><p>数据库一般都会并发执行多个事务，多个事务可能会并发的对相同的一批数据进行增删改查操作，可能就会导致脏写、脏读、不可重复读、幻读这些问题。 这些问题的本质都是数据库的多事务并发问题，为了解决多事务并发问题，数据库设计了事务隔离机制、锁机制、MVCC多版本并发控制隔离机制，用一整套机制来解决多事务并发问题。</p>
+<h1 id="事务及其ACID属性"><a href="#事务及其ACID属性" class="headerlink" title="事务及其ACID属性"></a>事务及其ACID属性</h1><p>事务是由一组SQL语句组成的逻辑处理单元,事务具有以下4个属性,通常简称为事务的ACID属性。 </p>
+<ul>
+<li><p>原子性(Atomicity) </p>
+<p>事务是一个原子操作单元，其对数据的修改,要么全都执行,要么全都不执行。</p>
+</li>
+<li><p>一致性(Consistent) </p>
+<p>在事务开始和完成时,数据都必须保持一致状态。这意味着所有相关的数据规则都必须应用于事务的修改，以保持数据的完整性。</p>
+</li>
+<li><p>隔离性(Isolation)</p>
+<p>数据库系统提供一定的隔离机制,保证事务在不受外部并发操作影响的“独立”环境执行。这意味着事务处理过程中的中间状态对外部是不可见的，反之亦然。</p>
+</li>
+<li><p>持久性(Durable)</p>
+<p>事务完成之后,它对于数据的修改是永久性的,即使出现系统故障也能够保持。</p>
+</li>
+</ul>
+<h2 id="并发事务处理带来的问题"><a href="#并发事务处理带来的问题" class="headerlink" title="并发事务处理带来的问题"></a>并发事务处理带来的问题</h2><h3 id="更新丢失-Lost-Update-或脏写"><a href="#更新丢失-Lost-Update-或脏写" class="headerlink" title="更新丢失(Lost Update)或脏写"></a>更新丢失(Lost Update)或脏写</h3><p>当两个或多个事务选择同一行，然后基于最初选定的值更新该行时，由于每个事务都不知道其他事务的存在，就会发生丢失更新问题–最后的更新覆盖了由其他事务所做的更新。</p>
+<h3 id="脏读-Dirty-Reads"><a href="#脏读-Dirty-Reads" class="headerlink" title="脏读(Dirty Reads)"></a>脏读(Dirty Reads)</h3><p>一个事务正在对一条记录做修改，在这个事务完成并提交前，这条记录的数据就处于不一致的状态；这时另一个事务也来读取同一条记录，如果不加控制，第二个事务读取了这些“脏”数据，并据此作进一步的处理，就会产生未提交的数据依赖关系。这种现象被形象的叫做“脏读”。  </p>
+<p>一句话：事务A读取到了事务B已经修改但尚未提交的数据，还在这个数据基础上做了操作。此时，如果B事务回滚，A读取的数据无效，不符合一致性要求。</p>
+<h3 id="不可重读-Non-Repeatable-Reads"><a href="#不可重读-Non-Repeatable-Reads" class="headerlink" title="不可重读(Non-Repeatable Reads)"></a>不可重读(Non-Repeatable Reads)</h3><p>一个事务在读取某些数据后的某个时间，再次读取以前读过的数据，却发现其读出的数据已经发生了改变、或某些记录已经被删除了。这种现象就叫做“不可重复读”。  </p>
+<p>一句话：事务A内部的相同查询语句在不同时刻读出的结果不一致，不符合隔离性</p>
+<h3 id="幻读-Phantom-Reads"><a href="#幻读-Phantom-Reads" class="headerlink" title="幻读(Phantom Reads)"></a>幻读(Phantom Reads)</h3><p>一个事务按相同的查询条件重新读取以前检索过的数据，却发现其他事务插入了满足其查询条件的新数据，这种现象就称为“幻读”。</p>
+<p>一句话:事务A读取到了事务B提交的新增数据，不符合隔离性</p>
+<h2 id="事务隔离级别"><a href="#事务隔离级别" class="headerlink" title="事务隔离级别"></a>事务隔离级别</h2><p>“脏读”、“不可重复读”和“幻读”，其实都是数据库读一致性问题，必须由数据库提供一定的事务隔离机制来解决。</p>
+<img src="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20211004171656.png" alt="image-20211004171656811" style="zoom:50%;" />
+
+<p>数据库的事务隔离越严格，并发副作用越小，但付出的代价也就越大，因为事务隔离实质上就是使事务在一定程度上“串行化”进行，这显然与“并发”是矛盾的。 同时不同的应用对读一致性和事务隔离程度的要求也是不同的，比如许多应用对“不可重复读”和“幻读”并不敏感，可能更关心数据并发访问的能力。</p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 常看当前数据库的事务隔离级别</span></span><br><span class="line"><span class="keyword">show</span> <span class="keyword">variables</span> <span class="keyword">like</span> <span class="string">&#x27;tx_isolation&#x27;</span>;</span><br><span class="line"></span><br><span class="line"><span class="comment"># 设置事务隔离级别</span></span><br><span class="line"><span class="keyword">set</span> tx_isolation=<span class="string">&#x27;REPEATABLE-READ&#x27;</span>;</span><br></pre></td></tr></table></figure>
+
+<p>Mysql默认的事务隔离级别是可重复读，用Spring开发程序时，如果不设置隔离级别默认用Mysql设置的隔离级别，如果Spring设置了就用已经设置的隔离级别</p>
+<h1 id="锁详解"><a href="#锁详解" class="headerlink" title="锁详解"></a>锁详解</h1><p>锁是计算机协调多个进程或线程并发访问某一资源的机制。 在数据库中，除了传统的计算资源(如CPU、RAM、I/O等)的争用以外，数据也是一种供需要用户共享的资 源。如何保证数据并发访问的一致性、有效性是所有数据库必须解决的一个问题，锁冲突也是影响数据库并发访问性能的一个重要因素。</p>
+<h2 id="锁分类"><a href="#锁分类" class="headerlink" title="锁分类"></a>锁分类</h2><ul>
+<li><p>从性能上分为<strong>乐观锁(用版本对比来实现) **和 **悲观锁</strong> </p>
+</li>
+<li><p>从对数据库操作的类型分，分为<strong>读锁和写锁(都属于悲观锁)</strong></p>
+<ul>
+<li><p>读锁(共享锁，S锁(Shared))</p>
+<p>针对同一份数据，多个读操作可以同时进行而不会互相影响 </p>
+</li>
+<li><p>写锁(排它锁，X锁(eXclusive))</p>
+<p>当前写操作没有完成前，它会阻断其他写锁和读锁</p>
+</li>
+</ul>
+</li>
+<li><p>从对数据操作的粒度分，分为表锁和行锁</p>
+</li>
+</ul>
+<h3 id="表锁"><a href="#表锁" class="headerlink" title="表锁"></a>表锁</h3><p>每次操作锁住整张表。开销小，加锁快，不会出现死锁；锁定粒度大，发生锁冲突的概率最高，并发度最低；<br>一般用在整表数据迁移的场景。</p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 建表SQL</span></span><br><span class="line"><span class="keyword">CREATE</span> <span class="keyword">TABLE</span> <span class="string">`mylock`</span> ( <span class="string">`id`</span> <span class="built_in">INT</span> ( <span class="number">11</span> ) <span class="keyword">NOT</span> <span class="literal">NULL</span> AUTO_INCREMENT, <span class="string">`NAME`</span> <span class="built_in">VARCHAR</span> ( <span class="number">20</span> ) <span class="keyword">DEFAULT</span> <span class="literal">NULL</span>, PRIMARY <span class="keyword">KEY</span> ( <span class="string">`id`</span> ) ) <span class="keyword">ENGINE</span> = MyISAM <span class="keyword">DEFAULT</span> <span class="keyword">CHARSET</span> = utf8;</span><br><span class="line"><span class="comment">#插入数据</span></span><br><span class="line"><span class="keyword">INSERT</span> <span class="keyword">INTO</span> <span class="string">`test`</span>.<span class="string">`mylock`</span> ( <span class="string">`id`</span>, <span class="string">`NAME`</span> )</span><br><span class="line"><span class="keyword">VALUES</span></span><br><span class="line">	( <span class="string">&#x27;1&#x27;</span>, <span class="string">&#x27;a&#x27;</span> );</span><br><span class="line"><span class="keyword">INSERT</span> <span class="keyword">INTO</span> <span class="string">`test`</span>.<span class="string">`mylock`</span> ( <span class="string">`id`</span>, <span class="string">`NAME`</span> )</span><br><span class="line"><span class="keyword">VALUES</span></span><br><span class="line">	( <span class="string">&#x27;2&#x27;</span>, <span class="string">&#x27;b&#x27;</span> );</span><br><span class="line"><span class="keyword">INSERT</span> <span class="keyword">INTO</span> <span class="string">`test`</span>.<span class="string">`mylock`</span> ( <span class="string">`id`</span>, <span class="string">`NAME`</span> )</span><br><span class="line"><span class="keyword">VALUES</span></span><br><span class="line">	( <span class="string">&#x27;3&#x27;</span>, <span class="string">&#x27;c&#x27;</span> );</span><br><span class="line"><span class="keyword">INSERT</span> <span class="keyword">INTO</span> <span class="string">`test`</span>.<span class="string">`mylock`</span> ( <span class="string">`id`</span>, <span class="string">`NAME`</span> )</span><br><span class="line"><span class="keyword">VALUES</span></span><br><span class="line">	( <span class="string">&#x27;4&#x27;</span>, <span class="string">&#x27;d&#x27;</span> );</span><br></pre></td></tr></table></figure>
+
+<ul>
+<li><p>手动增加表锁</p>
+<p>lock table 表名称 read(write),表名称2 read(write);</p>
+</li>
+<li><p>查看表上加过的锁 </p>
+<p>show open tables;</p>
+</li>
+<li><p>删除表锁 </p>
+<p>unlock tables;</p>
+</li>
+</ul>
+<h4 id="加读锁-MyISAM"><a href="#加读锁-MyISAM" class="headerlink" title="加读锁(MyISAM)"></a>加读锁(MyISAM)</h4><img src="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20211004192720.png" alt="image-20211004192720009" style="zoom:50%;" />
+
+<p>当前session和其他session都可以读该表 </p>
+<p>当前session中插入或者更新锁定的表都会报错，其他session插入或更新则会等待</p>
+<h4 id="加写锁-MyISAM"><a href="#加写锁-MyISAM" class="headerlink" title="加写锁(MyISAM)"></a>加写锁(MyISAM)</h4><img src="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20211004192852.png" alt="image-20211004192852003" style="zoom:50%;" />
+
+<p>当前session对该表的增删改查都没有问题，其他session对该表的所有操作被阻塞</p>
+<h4 id="案例结论"><a href="#案例结论" class="headerlink" title="案例结论"></a>案例结论</h4><p>对MyISAM表的读操作(加读锁) ，不会阻寒其他进程对同一表的读请求，但会阻赛对同一表的写请求。只有当读锁释放后才会执行其它进程的写操作。<br>对MylSAM表的写操作(加写锁) ，会阻塞其他进程对同一表的读和写操作，只有当写锁释放后才会执行其它进程的读写操作</p>
+<h3 id="行锁"><a href="#行锁" class="headerlink" title="行锁"></a>行锁</h3><p>每次操作锁住一行数据。开销大，加锁慢，会出现死锁；锁定粒度最小，发生锁冲突的概率最低，并发度最高。</p>
+<p>InnoDB与MYISAM的最大不同有两点:</p>
+<ul>
+<li>InnoDB支持事务(TRANSACTION) </li>
+<li>InnoDB支持行级锁</li>
+</ul>
+<h3 id="行锁演示"><a href="#行锁演示" class="headerlink" title="行锁演示"></a>行锁演示</h3><p>一个session开启事务更新不提交，另一个session更新同一条记录会阻塞，更新不同记录不会阻塞</p>
+<p>总结:</p>
+<ul>
+<li>MyISAM在执行查询语句SELECT前，会自动给涉及的所有表加读锁。在执行update、insert、delete操作会自动给涉及的表加写锁。 </li>
+<li>InnoDB在执行查询语句SELECT时(非串行隔离级别)，不会加锁。但是update、insert、delete操作会加行锁。</li>
+</ul>
+<p><strong>简而言之，就是读锁会阻塞写，但是不会阻塞读。而写锁则会把读和写都阻塞。</strong></p>
+<h1 id="行锁与事务隔离级别案例分析"><a href="#行锁与事务隔离级别案例分析" class="headerlink" title="行锁与事务隔离级别案例分析"></a>行锁与事务隔离级别案例分析</h1><figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">CREATE</span> <span class="keyword">TABLE</span> <span class="string">`account`</span> ( <span class="string">`id`</span> <span class="built_in">INT</span> ( <span class="number">11</span> ) <span class="keyword">NOT</span> <span class="literal">NULL</span> AUTO_INCREMENT, <span class="string">`name`</span> <span class="built_in">VARCHAR</span> ( <span class="number">255</span> ) <span class="keyword">DEFAULT</span> <span class="literal">NULL</span>, <span class="string">`balance`</span> <span class="built_in">INT</span> ( <span class="number">11</span> ) <span class="keyword">DEFAULT</span> <span class="literal">NULL</span>, PRIMARY <span class="keyword">KEY</span> ( <span class="string">`id`</span> ) ) <span class="keyword">ENGINE</span> = <span class="keyword">INNODB</span> <span class="keyword">DEFAULT</span> <span class="keyword">CHARSET</span> = utf8;</span><br><span class="line"><span class="keyword">INSERT</span> <span class="keyword">INTO</span> <span class="string">`test`</span>.<span class="string">`account`</span> ( <span class="string">`name`</span>, <span class="string">`balance`</span> )</span><br><span class="line"><span class="keyword">VALUES</span></span><br><span class="line">	( <span class="string">&#x27;lilei&#x27;</span>, <span class="string">&#x27;450&#x27;</span> );</span><br><span class="line"><span class="keyword">INSERT</span> <span class="keyword">INTO</span> <span class="string">`test`</span>.<span class="string">`account`</span> ( <span class="string">`name`</span>, <span class="string">`balance`</span> )</span><br><span class="line"><span class="keyword">VALUES</span></span><br><span class="line">	( <span class="string">&#x27;hanmei&#x27;</span>, <span class="string">&#x27;16000&#x27;</span> );</span><br><span class="line"><span class="keyword">INSERT</span> <span class="keyword">INTO</span> <span class="string">`test`</span>.<span class="string">`account`</span> ( <span class="string">`name`</span>, <span class="string">`balance`</span> )</span><br><span class="line"><span class="keyword">VALUES</span></span><br><span class="line">	( <span class="string">&#x27;lucy&#x27;</span>, <span class="string">&#x27;2400&#x27;</span> );</span><br></pre></td></tr></table></figure>
+
+<h2 id="读未提交"><a href="#读未提交" class="headerlink" title="读未提交"></a>读未提交</h2><ol>
+<li><p>(客户端A)打开一个客户端A，并设置当前事务模式为<code>read uncommitted</code>(读未提交)，查询表account的初始值</p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">set</span> tx_isolation=<span class="string">&#x27;read-uncommitted&#x27;</span>;</span><br></pre></td></tr></table></figure>
+
+<img src="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20211004200234.png" alt="image-20211004200234824" style="zoom:50%;" />
+</li>
+<li><p>(客户端B)在客户端A的事务提交之前，打开另一个客户端B，更新表account:</p>
+<img src="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20211004201606.png" alt="image-20211004201049993" style="zoom:50%;" />
+</li>
+<li><p>(客户端A)这时，虽然客户端B的事务还没提交，但是客户端A就可以查询到B已经更新的数据</p>
+<img src="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20211004215749.png" alt="image-20211004201324201" style="zoom:50%;" />
+</li>
+<li><p>(客户端B)一旦客户端B的事务因为某种原因回滚，所有的操作都将会被撤销，那客户端A查询到的数据其实就是脏数据</p>
+<img src="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20211004202032.png" alt="image-20211004202032019" style="zoom:50%;" />
+</li>
+<li><p>(客户端A)此时在客户端A查询，会发现实际值已经改变。</p>
+<img src="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20211004202755.png" alt="image-20211004202755939" style="zoom:50%;" />
+
+<p><strong>但是，实际java程序中，此时我们拿到的值并不会实时更新，拿到的值还是回滚之前的值，这是就产生了脏数据。</strong></p>
+<p>但是我们继续在A客户端执行如下语句</p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">update</span> <span class="keyword">account</span> <span class="keyword">set</span> balance = balance - <span class="number">50</span> <span class="keyword">where</span> <span class="keyword">id</span> =<span class="number">1</span>;</span><br><span class="line"><span class="keyword">SELECT</span> * <span class="keyword">from</span> <span class="keyword">account</span>;</span><br></pre></td></tr></table></figure>
+
+<img src="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20211004202839.png" alt="image-20211004202838964" style="zoom:50%;" />
+
+<p>数据没有变成350是因为我们的sql语句是用当前的balance值去操作的，所以操作的是最新的值。</p>
+<p>但如果是用java代码去操作，操作之前拿到的值还是400，并不能感知到其他事务的改变，所以操作后可能会变成350</p>
+<p><strong>要想解决这个问题可以采用读已提交的隔离级别</strong></p>
+</li>
+</ol>
+<h2 id="读已提交"><a href="#读已提交" class="headerlink" title="读已提交"></a>读已提交</h2><ol>
+<li><p>(客户端A)打开一个客户端A，并设置当前事务模式为<code>read committed</code>(未提交读)，查询表account的所有记录</p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">set</span> tx_isolation=<span class="string">&#x27;read-committed&#x27;</span>;</span><br></pre></td></tr></table></figure>
+
+<img src="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20211004203640.png" alt="image-20211004203640617" style="zoom:50%;" />
+</li>
+<li><p>(客户端B)在客户端A的事务提交之前，打开另一个客户端B，更新表account</p>
+<img src="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20211004203847.png" alt="image-20211004203847927" style="zoom:50%;" />
+</li>
+<li><p>(客户端A)这时，客户端B的事务还没提交，客户端A不能查询到B已经更新的数据，<strong>解决了脏读问题</strong></p>
+<p><strong>与读未提交不同，数据还是450</strong></p>
+<img src="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20211004204041.png" alt="image-20211004204041464" style="zoom:50%;" />
+</li>
+<li><p>(客户端B)客户端B的事务提交</p>
+<img src="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20211004205431.png" alt="image-20211004205431931" style="zoom:50%;" />
+</li>
+<li><p>(客户端A)客户端A执行与上一步相同的查询，<strong>结果与上一步不一致，即产生了不可重复读的问题</strong></p>
+<img src="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20211004205644.png" alt="image-20211004205644110" style="zoom:50%;" />
+
+</li>
+</ol>
+<h2 id="可重复读"><a href="#可重复读" class="headerlink" title="可重复读"></a>可重复读</h2><ol>
+<li><p>(客户端A)打开一个客户端A，并设置当前事务模式为<code>read committed</code>(未提交读)，查询表account的所有记录</p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">set</span> tx_isolation=<span class="string">&#x27;repeatable-read&#x27;</span>;</span><br></pre></td></tr></table></figure>
+
+<img src="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20211004210652.png" alt="image-20211004210652468" style="zoom:50%;" />
+</li>
+<li><p>(客户端B)在客户端A的事务提交之前，打开另一个客户端B，更新表account并提交</p>
+<img src="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20211004210755.png" alt="image-20211004210755506" style="zoom:50%;" />
+</li>
+<li><p>(客户端A)在客户端A查询表account的所有记录，与步骤1查询结果一致，没有出现不可重复读的问题</p>
+<img src="/Users/tianjie/Library/Application Support/typora-user-images/image-20211004211124147.png" alt="image-20211004211124147" style="zoom:50%;" />
+</li>
+<li><p>(客户端A)在客户端A，接着执行如下语句</p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">update</span> <span class="keyword">account</span> <span class="keyword">set</span> balance = balance - <span class="number">50</span> <span class="keyword">where</span> <span class="keyword">id</span> = <span class="number">1</span></span><br></pre></td></tr></table></figure>
+
+<p>balance没有变成 400-50=350，lilei的balance值用的是步骤2中的350来算的，所以是300，数据的一致性倒是没有被破坏。</p>
+<p><strong>可重复读的隔离级别下使用了MVCC(multi-version concurrency control)机制</strong></p>
+<p><strong>select操作不会更新版本号， 是快照读(历史版本)；</strong></p>
+<p><strong>insert、update和delete会更新版本号，是当前读(当前版本)。</strong></p>
+<img src="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20211004211848.png" alt="image-20211004211848349" style="zoom:50%;" />
+</li>
+<li><p>(客户端B)重新打开客户端B，插入一条新数据后提交</p>
+<img src="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20211004212129.png" alt="image-20211004212129173" style="zoom:50%;" />
+</li>
+<li><p>(客户端A)在客户端A查询表account的所有记录，没有查出新增数据，所以没有出现幻读</p>
+<img src="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20211004212209.png" alt="image-20211004212209342" style="zoom:50%;" />
+</li>
+<li><p>(客户端A)验证幻读，在客户端A执行如下语句</p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">update</span> <span class="keyword">account</span> <span class="keyword">set</span> balance=<span class="number">888</span> <span class="keyword">where</span> <span class="keyword">id</span> = <span class="number">4</span>;</span><br></pre></td></tr></table></figure>
+
+<p>能更新成功，再次查询能查到客户端B新增的数据</p>
+<img src="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20211004212337.png" alt="image-20211004212337170" style="zoom:50%;" />
+
+
+
+</li>
+</ol>
+<h2 id="串行化"><a href="#串行化" class="headerlink" title="串行化"></a>串行化</h2><ol>
+<li><p>(客户端A)打开一个客户端A，并设置当前事务模式为serializable，查询表account的初始值</p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">set</span> tx_isolation=<span class="string">&#x27;serializable&#x27;</span>;</span><br></pre></td></tr></table></figure>
+
+<img src="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20211004213028.png" alt="image-20211004213028770" style="zoom:50%;" />
+</li>
+<li><p>(客户端B)打开一个客户端B，并设置当前事务模式为serializable.</p>
+<p>更新相同的id为1的记录会被阻塞等待，更新id 为2的记录可以成功，说明在串行模式下innodb的查询也会被加上行锁。 </p>
+<p>如果客户端A执行的是一个范围查询，<strong>那么该范围内的所有行，包括每行记录所在的间隙区间范围(就算该行数据还未被插入也会加锁，这种是间隙锁)都会被加锁</strong>。</p>
+<p><strong>此时如果客户端B在该范围内插入数据都会被阻塞，所以就避免了幻读。</strong></p>
+<p>这种隔离级别并发性极低，开发中很少会用到。</p>
+<img src="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20211004213330.png" alt="image-20211004213330495" style="zoom:50%;" />
+
+<img src="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20211004213414.png" alt="image-20211004213414367" style="zoom:50%;" />
+
+
+
+</li>
+</ol>
+<h1 id="间隙锁-Gap-Lock"><a href="#间隙锁-Gap-Lock" class="headerlink" title="间隙锁(Gap Lock)"></a>间隙锁(Gap Lock)</h1><p>间隙锁，锁的就是两个值之间的空隙。Mysql默认级别是repeatable-read，有办法解决幻读问题吗?</p>
+<p>间隙锁 在某些情况下可以解决幻读问题。<br>假设account表里数据如下:</p>
+<img src="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20211004213522.png" alt="image-20211004213522026" style="zoom:50%;" />
+
+<p>那么间隙就有 id 为 (3,10)，(10,20)，(20,正无穷) 这三个区间，<br>在Session_1下面执行</p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">update</span> <span class="keyword">account</span> <span class="keyword">set</span> <span class="keyword">name</span> = <span class="string">&#x27;zhangsan&#x27;</span> <span class="keyword">where</span> <span class="keyword">id</span> &gt; <span class="number">8</span> <span class="keyword">and</span> <span class="keyword">id</span> &lt;<span class="number">18</span>;</span><br></pre></td></tr></table></figure>
+
+<p><strong>则其他Session没法在这个范围所包含的所有行记录(包括间隙行记录)以及行记录所在的间隙里插入或修改任何数据，即id在 (3,20]区间都无法修改数据，注意最后那个20也是包含在内的。</strong><br><strong>间隙锁是在可重复读隔离级别下才会生效</strong>。</p>
+<h1 id="临键锁-Next-key-Locks"><a href="#临键锁-Next-key-Locks" class="headerlink" title="临键锁(Next-key Locks)"></a>临键锁(Next-key Locks)</h1><p><strong>Next-Key Locks是行锁与间隙锁的组合。</strong></p>
+<p><strong>像上面那个例子里的这个(3,20]的整个区间可以叫做临键锁。</strong></p>
+<h1 id="无索引行锁会升级为表锁"><a href="#无索引行锁会升级为表锁" class="headerlink" title="无索引行锁会升级为表锁"></a><strong>无索引行锁会升级为表锁</strong></h1><p>锁主要是加在索引上，如果对非索引字段更新，行锁可能会变表锁</p>
+<p>session1 执行</p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">update</span> <span class="keyword">account</span> <span class="keyword">set</span> balance = <span class="number">800</span> <span class="keyword">where</span> <span class="keyword">name</span> = <span class="string">&#x27;lilei&#x27;</span>;</span><br></pre></td></tr></table></figure>
+
+<p>session2 对该表任一行操作都会阻塞住。</p>
+<p><strong>InnoDB的行锁是针对索引加的锁，不是针对记录加的锁。并且该索引不能失效，否则都会从行锁升级为表锁。</strong></p>
+<p>锁定某一行还可以用<code>lock in share mode(共享锁)</code> 和<code>for update(排它锁)</code></p>
+<p>例如</p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">select</span> * <span class="keyword">from</span> test_innodb_lock <span class="keyword">where</span> a = <span class="number">2</span> <span class="keyword">for</span> <span class="keyword">update</span>; </span><br></pre></td></tr></table></figure>
+
+<p>这样其他session只能读这行数据，修改则会被阻塞，直到锁定行的session提交</p>
+<p><strong>结论</strong></p>
+<p>Innodb存储引擎由于实现了行级锁定，虽然在锁定机制的实现方面所带来的性能损耗可能比表级锁定会要更 高一下，但是在整体并发处理能力方面要远远优于MYISAM的表级锁定的。当系统并发量高的时候，Innodb 的整体性能和MYISAM相比就会有比较明显的优势了。 但是，Innodb的行级锁定同样也有其脆弱的一面，当我们使用不当的时候，可能会让Innodb的整体性能表现不仅不能比MYISAM高，甚至可能会更差。</p>
+<h1 id="行锁分析"><a href="#行锁分析" class="headerlink" title="行锁分析"></a>行锁分析</h1><p>通过检查InnoDB_row_lock状态变量来分析系统上的行锁的争夺情况</p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">show</span> <span class="keyword">status</span> <span class="keyword">like</span><span class="string">&#x27;innodb_row_lock%&#x27;</span>;</span><br></pre></td></tr></table></figure>
+
+<p>对各个状态量的说明如下:</p>
+<ul>
+<li>Innodb_row_lock_current_waits: 当前正在等待锁定的数量 </li>
+<li>Innodb_row_lock_time: 从系统启动到现在锁定总时间长度 </li>
+<li>Innodb_row_lock_time_avg: 每次等待所花平均时间 </li>
+<li>Innodb_row_lock_time_max:从系统启动到现在等待最长的一次所花时间</li>
+<li>Innodb_row_lock_waits:系统启动后到现在总共等待的次数</li>
+</ul>
+<p>对于这5个状态变量，比较重要的主要是:</p>
+<p>Innodb_row_lock_time_avg (等待平均时长)</p>
+<p>Innodb_row_lock_waits (等待总次数) </p>
+<p>Innodb_row_lock_time(等待总时长)</p>
+<p>尤其是当等待次数很高，而且每次等待时长也不小的时候，我们就需要分析系统中为什么会有如此多的等待，然后根据分析结果着手制定优化计划。</p>
+<h1 id="查看INFORMATION-SCHEMA系统库锁相关数据表"><a href="#查看INFORMATION-SCHEMA系统库锁相关数据表" class="headerlink" title="查看INFORMATION_SCHEMA系统库锁相关数据表"></a>查看INFORMATION_SCHEMA系统库锁相关数据表</h1><figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">#查看事务</span></span><br><span class="line"><span class="keyword">select</span>*fromINFORMATION_SCHEMA.INNODB_TRX;</span><br><span class="line"><span class="comment">#查看锁</span></span><br><span class="line"><span class="keyword">select</span>*fromINFORMATION_SCHEMA.INNODB_LOCKS;</span><br><span class="line"><span class="comment">#查看锁等待</span></span><br><span class="line"><span class="keyword">select</span>*fromINFORMATION_SCHEMA.INNODB_LOCK_WAITS;</span><br><span class="line"></span><br><span class="line"><span class="comment">#释放锁，trx_mysql_thread_id可以从INNODB_TRX表里查看到</span></span><br><span class="line"><span class="keyword">kill</span> trx_mysql_thread_id</span><br><span class="line"></span><br><span class="line"><span class="comment">#查看锁等待详细信息</span></span><br><span class="line"><span class="keyword">show</span> <span class="keyword">engine</span> <span class="keyword">innodb</span> <span class="keyword">status</span>\G;</span><br></pre></td></tr></table></figure>
+
+
+
+<h1 id="死锁"><a href="#死锁" class="headerlink" title="死锁"></a><strong>死锁</strong></h1><figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">set</span> tx_isolation=<span class="string">&#x27;repeatable-read&#x27;</span>;</span><br><span class="line"></span><br><span class="line"><span class="comment">#Session_1执行</span></span><br><span class="line"><span class="keyword">select</span> * <span class="keyword">from</span> <span class="keyword">account</span> <span class="keyword">where</span> <span class="keyword">id</span>=<span class="number">1</span> <span class="keyword">for</span> <span class="keyword">update</span>;</span><br><span class="line"><span class="comment">#Session_2执行</span></span><br><span class="line"><span class="keyword">select</span> * <span class="keyword">from</span> <span class="keyword">account</span> <span class="keyword">where</span> <span class="keyword">id</span>=<span class="number">2</span> <span class="keyword">for</span> <span class="keyword">update</span>;</span><br><span class="line"><span class="comment">#Session_1执行</span></span><br><span class="line"><span class="keyword">select</span> * <span class="keyword">from</span> <span class="keyword">account</span> <span class="keyword">where</span> <span class="keyword">id</span>=<span class="number">2</span> <span class="keyword">for</span> <span class="keyword">update</span>;</span><br><span class="line"><span class="comment">#Session_2执行</span></span><br><span class="line"><span class="keyword">select</span> * <span class="keyword">from</span> <span class="keyword">account</span> <span class="keyword">where</span> <span class="keyword">id</span>=<span class="number">1</span> <span class="keyword">for</span> <span class="keyword">update</span>;</span><br><span class="line"><span class="comment">#查看近期死锁日志信息</span></span><br><span class="line"><span class="keyword">show</span> <span class="keyword">engine</span> <span class="keyword">innodb</span> <span class="keyword">status</span>\G; </span><br></pre></td></tr></table></figure>
+
+<p>大多数情况mysql可以自动检测死锁并回滚产生死锁的那个事务，但是有些情况mysql没法自动检测死锁</p>
+<h1 id="锁优化建议"><a href="#锁优化建议" class="headerlink" title="锁优化建议"></a>锁优化建议</h1><p>尽可能让所有数据检索都通过索引来完成，避免无索引行锁升级为表锁合理设计索引，尽量缩小锁的范围<br>尽可能减少检索条件范围，<strong>避免间隙锁尽量，控制事务大小</strong>，减少锁定资源量和时间长度，涉及事务加锁的sql尽量放在事务最后执行尽可能低级别事务隔离</p>
+
+      
+    </div>
+    <div class="article-footer">
+      <blockquote class="mt-2x">
+  <ul class="post-copyright list-unstyled">
+    
+    <li class="post-copyright-link hidden-xs">
+      <strong>本文链接：</strong>
+      <a href="https://tj-ever.github.io/2021/10/04/MySQL%20%E4%BA%8B%E5%8A%A1%E5%8F%8A%E9%94%81%E6%9C%BA%E5%88%B6/" title="MySQL 事务及锁机制" target="_blank" rel="external">https://tj-ever.github.io/2021/10/04/MySQL 事务及锁机制/</a>
+    </li>
+    
+    <li class="post-copyright-license">
+      <strong>版权声明： </strong> 本博客所有文章除特别声明外，均采用 <a href="http://creativecommons.org/licenses/by/4.0/deed.zh" target="_blank" rel="external">CC BY 4.0 CN协议</a> 许可协议。转载请注明出处！
+    </li>
+  </ul>
+</blockquote>
+
+
+<div class="panel panel-default panel-badger">
+  <div class="panel-body">
+    <figure class="media">
+      <div class="media-left">
+        <a href="https://github.com/cofess" target="_blank" class="img-burn thumb-sm visible-lg">
+          <img src="/images/avatar.jpg" class="img-rounded w-full" alt="">
+        </a>
+      </div>
+      <div class="media-body">
+        <h3 class="media-heading"><a href="https://github.com/cofess" target="_blank"><span class="text-dark">Ever</span><small class="ml-1x">Ever的个人博客</small></a></h3>
+        <div>啊啊啊啊这功能做不了。</div>
+      </div>
+    </figure>
+  </div>
+</div>
+
+
+    </div>
+  </article>
+  
+    
+  <section id="comments">
+  	
+      <div id="vcomments"></div>
+    
+  </section>
+
+
+  
+</div>
+
+  <nav class="bar bar-footer clearfix" data-stick-bottom>
+  <div class="bar-inner">
+  
+  <ul class="pager pull-left">
+    
+    <li class="prev">
+      <a href="/2021/10/05/MySQL%20MVCC%E5%8F%8ABufferPool%E6%9C%BA%E5%88%B6/" title="MySQL MVCC及BufferPool机制"><i class="icon icon-angle-left" aria-hidden="true"></i><span>&nbsp;&nbsp;上一篇</span></a>
+    </li>
+    
+    
+    <li class="next">
+      <a href="/2021/10/03/MySQL%20%E7%B4%A2%E5%BC%95%E4%BC%98%E5%8C%96/" title="MySQL 索引优化"><span>下一篇&nbsp;&nbsp;</span><i class="icon icon-angle-right" aria-hidden="true"></i></a>
+    </li>
+    
+    
+  </ul>
+  
+  
+  <!-- Button trigger modal -->
+  <button type="button" class="btn btn-fancy btn-donate pop-onhover bg-gradient-warning" data-toggle="modal" data-target="#donateModal"><span>赏</span></button>
+  <!-- <div class="wave-icon wave-icon-danger btn-donate" data-toggle="modal" data-target="#donateModal">
+    <div class="wave-circle"><span class="icon"><i class="icon icon-bill"></i></span></div>
+  </div> -->
+  
+  
+  <div class="bar-right">
+    
+    <div class="share-component" data-sites="weibo,qq,wechat,facebook,twitter" data-mobile-sites="weibo,qq,qzone"></div>
+    
+  </div>
+  </div>
+</nav>
+  
+<!-- Modal -->
+<div class="modal modal-center modal-small modal-xs-full fade" id="donateModal" tabindex="-1" role="dialog">
+  <div class="modal-dialog" role="document">
+    <div class="modal-content donate">
+      <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+      <div class="modal-body">
+        <div class="donate-box">
+          <div class="donate-head">
+            <p>感谢您的支持，我会继续努力的!</p>
+          </div>
+          <div class="tab-content">
+            <div role="tabpanel" class="tab-pane fade active in" id="alipay">
+              <div class="donate-payimg">
+                <img src="/images/donate/alipayimg.png" alt="扫码支持" title="扫一扫" />
+              </div>
+              <p class="text-muted mv">扫码打赏，你说多少就多少</p>
+              <p class="text-grey">打开支付宝扫一扫，即可进行扫码打赏哦</p>
+            </div>
+            <div role="tabpanel" class="tab-pane fade" id="wechatpay">
+              <div class="donate-payimg">
+                <img src="/images/donate/wechatpayimg.png" alt="扫码支持" title="扫一扫" />
+              </div>
+              <p class="text-muted mv">扫码打赏，你说多少就多少</p>
+              <p class="text-grey">打开微信扫一扫，即可进行扫码打赏哦</p>
+            </div>
+          </div>
+          <div class="donate-footer">
+            <ul class="nav nav-tabs nav-justified" role="tablist">
+              <li role="presentation" class="active">
+                <a href="#alipay" id="alipay-tab" role="tab" data-toggle="tab" aria-controls="alipay" aria-expanded="true"><i class="icon icon-alipay"></i> 支付宝</a>
+              </li>
+              <li role="presentation" class="">
+                <a href="#wechatpay" role="tab" id="wechatpay-tab" data-toggle="tab" aria-controls="wechatpay" aria-expanded="false"><i class="icon icon-wepay"></i> 微信支付</a>
+              </li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+
+</main>
+
+  <footer class="footer" itemscope itemtype="http://schema.org/WPFooter">
+	
+	
+    <ul class="social-links">
+    	
+        <li><a href="https://weibo.com/u/2735829887" target="_blank" title="Weibo" data-toggle=tooltip data-placement=top><i class="icon icon-weibo"></i></a></li>
+        
+    </ul>
+
+    <div class="copyright">
+    	
+        <div class="publishby">
+        	Theme by <a href="https://github.com/cofess" target="_blank"> cofess </a>base on <a href="https://github.com/cofess/hexo-theme-pure" target="_blank">pure</a>.
+        </div>
+    </div>
+</footer>
+  <script src="//cdn.jsdelivr.net/npm/jquery@1.12.4/dist/jquery.min.js"></script>
+<script>
+window.jQuery || document.write('<script src="js/jquery.min.js"><\/script>')
+</script>
+
+<script src="/js/plugin.min.js"></script>
+
+
+<script src="/js/application.js"></script>
+
+
+    <script>
+(function (window) {
+    var INSIGHT_CONFIG = {
+        TRANSLATION: {
+            POSTS: '文章',
+            PAGES: '页面',
+            CATEGORIES: '分类',
+            TAGS: '标签',
+            UNTITLED: '(未命名)',
+        },
+        ROOT_URL: '/',
+        CONTENT_URL: '/content.json',
+    };
+    window.INSIGHT_CONFIG = INSIGHT_CONFIG;
+})(window);
+</script>
+
+<script src="/js/insight.js"></script>
+
+
+
+
+
+
+   
+
+
+
+
+   
+    
+  <script src="//cdn1.lncld.net/static/js/3.0.4/av-min.js"></script>
+  <script src="//cdn.jsdelivr.net/npm/valine"></script>
+  <script type="text/javascript">
+  var GUEST = ['nick', 'mail', 'link'];
+  var meta = 'nick,mail,link';
+  meta = meta.split(',').filter(function(item) {
+    return GUEST.indexOf(item) > -1;
+  });
+  new Valine({
+    el: '#vcomments',
+    verify: false,
+    notify: false,
+    appId: '',
+    appKey: '',
+    placeholder: 'Just go go',
+    avatar: 'mm',
+    meta: meta,
+    pageSize: '10' || 10,
+    visitor: false
+  });
+  </script>
+
+     
+
+
+
+
+
+
+
+</body>
+</html>

@@ -1,0 +1,735 @@
+<!DOCTYPE html>
+<html lang=zh>
+<head>
+  <meta charset="utf-8">
+  
+  <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no, minimal-ui">
+  <meta name="renderer" content="webkit">
+  <meta http-equiv="Cache-Control" content="no-transform" />
+  <meta http-equiv="Cache-Control" content="no-siteapp" />
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <meta name="format-detection" content="telephone=no,email=no,adress=no">
+  <!-- Color theme for statusbar -->
+  <meta name="theme-color" content="#000000" />
+  <!-- 强制页面在当前窗口以独立页面显示,防止别人在框架里调用页面 -->
+  <meta http-equiv="window-target" content="_top" />
+  
+  
+  <title>并发编程 JMM模型和volatile | Ever的个人博客</title>
+  <meta name="description" content="计算机硬件结构      多CPU一个现代CPU除了处理器核心之外还包括寄存器、L1L2L3缓存这些存储设备、浮点运算单元、整数运算单元等一些辅助运算设备以及内部总线等。 一个多核的CPU也就是一个CPU上有多个处理器核心。比如说现在我们要在一台计算机上跑一个多线程的程序，因为是一个进程里的线程，所以需要一些共享一些存储变量，如果这台计算机都是单核单线程CPU的话，就意味着这个程序的不同线程需要经">
+<meta property="og:type" content="article">
+<meta property="og:title" content="并发编程 JMM模型和volatile">
+<meta property="og:url" content="https://tj-ever.github.io/2021/06/14/%E5%B9%B6%E5%8F%91%E7%BC%96%E7%A8%8B%20JMM%E6%A8%A1%E5%9E%8B%E5%92%8Cvolatile/index.html">
+<meta property="og:site_name" content="Ever的个人博客">
+<meta property="og:description" content="计算机硬件结构      多CPU一个现代CPU除了处理器核心之外还包括寄存器、L1L2L3缓存这些存储设备、浮点运算单元、整数运算单元等一些辅助运算设备以及内部总线等。 一个多核的CPU也就是一个CPU上有多个处理器核心。比如说现在我们要在一台计算机上跑一个多线程的程序，因为是一个进程里的线程，所以需要一些共享一些存储变量，如果这台计算机都是单核单线程CPU的话，就意味着这个程序的不同线程需要经">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20210529230500.png">
+<meta property="og:image" content="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20210530152701.png">
+<meta property="og:image" content="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20210530193840.png">
+<meta property="og:image" content="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20210610151337.png">
+<meta property="og:image" content="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20210610154417.png">
+<meta property="og:image" content="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20210610172617.png">
+<meta property="og:image" content="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20210614214520.png">
+<meta property="og:image" content="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20210614220605.png">
+<meta property="og:image" content="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20210614224731.png">
+<meta property="article:published_time" content="2021-06-13T16:00:00.000Z">
+<meta property="article:modified_time" content="2021-07-07T02:43:46.721Z">
+<meta property="article:author" content="Ever">
+<meta property="article:tag" content="并发编程">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20210529230500.png">
+  <!-- Canonical links -->
+  <link rel="canonical" href="https://tj-ever.github.io/2021/06/14/%E5%B9%B6%E5%8F%91%E7%BC%96%E7%A8%8B%20JMM%E6%A8%A1%E5%9E%8B%E5%92%8Cvolatile/index.html">
+  
+    <link rel="alternate" href="/atom.xml" title="Ever的个人博客" type="application/atom+xml">
+  
+  
+    <link rel="icon" href="/favicon.png" type="image/x-icon">
+  
+  
+<link rel="stylesheet" href="/css/style.css">
+
+  
+  
+  
+  
+<meta name="generator" content="Hexo 5.2.0"></head>
+
+
+<body class="main-center" itemscope itemtype="http://schema.org/WebPage">
+  <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+  <div class="slimContent">
+    <div class="navbar-header">
+      
+      
+      <div class="profile-block text-center">
+        <a id="avatar" href="https://github.com/cofess" target="_blank">
+          <img class="img-circle img-rotate" src="/images/avatar.jpg" width="200" height="200">
+        </a>
+        <h2 id="name" class="hidden-xs hidden-sm">Ever</h2>
+        <h3 id="title" class="hidden-xs hidden-sm hidden-md">Ever的个人博客</h3>
+        <small id="location" class="text-muted hidden-xs hidden-sm"><i class="icon icon-map-marker"></i> Xian, China</small>
+      </div>
+      
+      <div class="search" id="search-form-wrap">
+
+    <form class="search-form sidebar-form">
+        <div class="input-group">
+            <input type="text" class="search-form-input form-control" placeholder="搜索" />
+            <span class="input-group-btn">
+                <button type="submit" class="search-form-submit btn btn-flat" onclick="return false;"><i class="icon icon-search"></i></button>
+            </span>
+        </div>
+    </form>
+    <div class="ins-search">
+  <div class="ins-search-mask"></div>
+  <div class="ins-search-container">
+    <div class="ins-input-wrapper">
+      <input type="text" class="ins-search-input" placeholder="想要查找什么..." x-webkit-speech />
+      <button type="button" class="close ins-close ins-selectable" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">×</span></button>
+    </div>
+    <div class="ins-section-wrapper">
+      <div class="ins-section-container"></div>
+    </div>
+  </div>
+</div>
+
+
+</div>
+      <button class="navbar-toggle collapsed" type="button" data-toggle="collapse" data-target="#main-navbar" aria-controls="main-navbar" aria-expanded="false">
+        <span class="sr-only">Toggle navigation</span>
+        <span class="icon-bar"></span>
+        <span class="icon-bar"></span>
+        <span class="icon-bar"></span>
+      </button>
+    </div>
+    <nav id="main-navbar" class="collapse navbar-collapse" itemscope itemtype="http://schema.org/SiteNavigationElement" role="navigation">
+      <ul class="nav navbar-nav main-nav ">
+        
+        
+        <li class="menu-item menu-item-home">
+          <a href="/.">
+            
+            <i class="icon icon-home-fill"></i>
+            
+            <span class="menu-title">首页</span>
+          </a>
+        </li>
+        
+        
+        <li class="menu-item menu-item-archives">
+          <a href="/archives">
+            
+            <i class="icon icon-archives-fill"></i>
+            
+            <span class="menu-title">归档</span>
+          </a>
+        </li>
+        
+        
+        <li class="menu-item menu-item-categories">
+          <a href="/categories">
+            
+            <i class="icon icon-folder"></i>
+            
+            <span class="menu-title">分类</span>
+          </a>
+        </li>
+        
+        
+        <li class="menu-item menu-item-tags">
+          <a href="/tags">
+            
+            <i class="icon icon-tags"></i>
+            
+            <span class="menu-title">标签</span>
+          </a>
+        </li>
+        
+        
+        <li class="menu-item menu-item-repository">
+          <a href="/repository">
+            
+            <i class="icon icon-project"></i>
+            
+            <span class="menu-title">项目</span>
+          </a>
+        </li>
+        
+        
+        <li class="menu-item menu-item-books">
+          <a href="/books">
+            
+            <i class="icon icon-book-fill"></i>
+            
+            <span class="menu-title">书单</span>
+          </a>
+        </li>
+        
+        
+        <li class="menu-item menu-item-links">
+          <a href="/links">
+            
+            <i class="icon icon-friendship"></i>
+            
+            <span class="menu-title">友链</span>
+          </a>
+        </li>
+        
+        
+        <li class="menu-item menu-item-about">
+          <a href="/about">
+            
+            <i class="icon icon-cup-fill"></i>
+            
+            <span class="menu-title">关于</span>
+          </a>
+        </li>
+        
+      </ul>
+      
+	
+    <ul class="social-links">
+    	
+        <li><a href="https://weibo.com/u/2735829887" target="_blank" title="Weibo" data-toggle=tooltip data-placement=top><i class="icon icon-weibo"></i></a></li>
+        
+    </ul>
+
+    </nav>
+  </div>
+</header>
+
+  
+    <aside class="sidebar" itemscope itemtype="http://schema.org/WPSideBar">
+  <div class="slimContent">
+    
+      <div class="widget">
+    <h3 class="widget-title">公告</h3>
+    <div class="widget-body">
+        <div id="board">
+            <div class="content">
+                <p>qq:&nbsp471958719</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+    
+      
+
+    
+      
+  <div class="widget">
+    <h3 class="widget-title">标签</h3>
+    <div class="widget-body">
+      <ul class="tag-list" itemprop="keywords"><li class="tag-list-item"><a class="tag-list-link" href="/tags/JVM/" rel="tag">JVM</a><span class="tag-list-count">4</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/JVM-Arthas/" rel="tag">JVM Arthas</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/MySQL/" rel="tag">MySQL</a><span class="tag-list-count">5</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Zookeeper/" rel="tag">Zookeeper</a><span class="tag-list-count">3</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/docker/" rel="tag">docker</a><span class="tag-list-count">3</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/hashmap/" rel="tag">hashmap</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/k8s/" rel="tag">k8s</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/linux/" rel="tag">linux</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/oracle/" rel="tag">oracle</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/rabbitmq/" rel="tag">rabbitmq</a><span class="tag-list-count">3</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/redis/" rel="tag">redis</a><span class="tag-list-count">3</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/sql/" rel="tag">sql</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E5%89%8D%E7%AB%AF/" rel="tag">前端</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E5%B9%B6%E5%8F%91%E7%BC%96%E7%A8%8B/" rel="tag">并发编程</a><span class="tag-list-count">7</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E7%8E%AF%E5%A2%83%E6%90%AD%E5%BB%BA/" rel="tag">环境搭建</a><span class="tag-list-count">1</span></li></ul>
+    </div>
+  </div>
+
+
+    
+      
+  <div class="widget">
+    <h3 class="widget-title">标签云</h3>
+    <div class="widget-body tagcloud">
+      <a href="/tags/JVM/" style="font-size: 13.5px;">JVM</a> <a href="/tags/JVM-Arthas/" style="font-size: 13px;">JVM Arthas</a> <a href="/tags/MySQL/" style="font-size: 13.75px;">MySQL</a> <a href="/tags/Zookeeper/" style="font-size: 13.25px;">Zookeeper</a> <a href="/tags/docker/" style="font-size: 13.25px;">docker</a> <a href="/tags/hashmap/" style="font-size: 13px;">hashmap</a> <a href="/tags/k8s/" style="font-size: 13px;">k8s</a> <a href="/tags/linux/" style="font-size: 13px;">linux</a> <a href="/tags/oracle/" style="font-size: 13px;">oracle</a> <a href="/tags/rabbitmq/" style="font-size: 13.25px;">rabbitmq</a> <a href="/tags/redis/" style="font-size: 13.25px;">redis</a> <a href="/tags/sql/" style="font-size: 13px;">sql</a> <a href="/tags/%E5%89%8D%E7%AB%AF/" style="font-size: 13px;">前端</a> <a href="/tags/%E5%B9%B6%E5%8F%91%E7%BC%96%E7%A8%8B/" style="font-size: 14px;">并发编程</a> <a href="/tags/%E7%8E%AF%E5%A2%83%E6%90%AD%E5%BB%BA/" style="font-size: 13px;">环境搭建</a>
+    </div>
+  </div>
+
+    
+      
+  <div class="widget">
+    <h3 class="widget-title">归档</h3>
+    <div class="widget-body">
+      <ul class="archive-list"><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/11/">十一月 2021</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/10/">十月 2021</a><span class="archive-list-count">8</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/09/">九月 2021</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/08/">八月 2021</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/07/">七月 2021</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/06/">六月 2021</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/12/">十二月 2020</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/11/">十一月 2020</a><span class="archive-list-count">6</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/10/">十月 2020</a><span class="archive-list-count">5</span></li></ul>
+    </div>
+  </div>
+
+
+    
+      
+  <div class="widget">
+    <h3 class="widget-title">最新文章</h3>
+    <div class="widget-body">
+      <ul class="recent-post-list list-unstyled no-thumbnail">
+        
+          <li>
+            
+            <div class="item-inner">
+              <p class="item-category">
+                
+              </p>
+              <p class="item-title">
+                <a href="/2021/11/01/Rabbitmq%E5%AE%9E%E7%8E%B0%E6%B6%88%E6%81%AF%E5%8F%AF%E9%9D%A0%E6%80%A7%E6%8A%95%E9%80%92/" class="title">Rabbitmq 消息可靠性投递两种方案</a>
+              </p>
+              <p class="item-date">
+                <time datetime="2021-10-31T16:00:00.000Z" itemprop="datePublished">2021-11-01</time>
+              </p>
+            </div>
+          </li>
+          
+          <li>
+            
+            <div class="item-inner">
+              <p class="item-category">
+                
+              </p>
+              <p class="item-title">
+                <a href="/2021/10/25/Rabbitmq%20%E9%AB%98%E7%BA%A7%E7%89%B9%E6%80%A7%E5%8F%8A%E6%95%B4%E5%90%88springboot/" class="title">Rabbitmq 高级特性及整合springboot</a>
+              </p>
+              <p class="item-date">
+                <time datetime="2021-10-24T16:00:00.000Z" itemprop="datePublished">2021-10-25</time>
+              </p>
+            </div>
+          </li>
+          
+          <li>
+            
+            <div class="item-inner">
+              <p class="item-category">
+                
+              </p>
+              <p class="item-title">
+                <a href="/2021/10/22/Rabbitmq%20%E7%8E%AF%E5%A2%83%E6%90%AD%E5%BB%BA%E5%8F%8A%E5%9F%BA%E6%9C%AC%E4%BD%BF%E7%94%A8/" class="title">Rabbitmq 环境搭建及基本使用</a>
+              </p>
+              <p class="item-date">
+                <time datetime="2021-10-21T16:00:00.000Z" itemprop="datePublished">2021-10-22</time>
+              </p>
+            </div>
+          </li>
+          
+          <li>
+            
+            <div class="item-inner">
+              <p class="item-category">
+                
+              </p>
+              <p class="item-title">
+                <a href="/2021/10/21/zookeeper%20leader/" class="title">Zookeeper 源码构建 阅读</a>
+              </p>
+              <p class="item-date">
+                <time datetime="2021-10-20T16:00:00.000Z" itemprop="datePublished">2021-10-21</time>
+              </p>
+            </div>
+          </li>
+          
+          <li>
+            
+            <div class="item-inner">
+              <p class="item-category">
+                
+              </p>
+              <p class="item-title">
+                <a href="/2021/10/07/Zookeeper%20%E5%AE%A2%E6%88%B7%E7%AB%AF%E4%BD%BF%E7%94%A8%E5%8F%8A%E9%9B%86%E7%BE%A4/" class="title">Zookeeper 客户端使用及集群</a>
+              </p>
+              <p class="item-date">
+                <time datetime="2021-10-06T16:00:00.000Z" itemprop="datePublished">2021-10-07</time>
+              </p>
+            </div>
+          </li>
+          
+      </ul>
+    </div>
+  </div>
+  
+
+    
+  </div>
+</aside>
+
+  
+  
+<main class="main" role="main">
+  <div class="content">
+  <article id="post-并发编程 JMM模型和volatile" class="article article-type-post" itemscope itemtype="http://schema.org/BlogPosting">
+    
+    <div class="article-header">
+      
+        
+  
+    <h1 class="article-title" itemprop="name">
+      并发编程 JMM模型和volatile
+    </h1>
+  
+
+      
+      <div class="article-meta">
+        <span class="article-date">
+    <i class="icon icon-calendar-check"></i>
+	<a href="/2021/06/14/%E5%B9%B6%E5%8F%91%E7%BC%96%E7%A8%8B%20JMM%E6%A8%A1%E5%9E%8B%E5%92%8Cvolatile/" class="article-date">
+	  <time datetime="2021-06-13T16:00:00.000Z" itemprop="datePublished">2021-06-14</time>
+	</a>
+</span>
+        
+        
+  <span class="article-tag">
+    <i class="icon icon-tags"></i>
+	<a class="article-tag-link-link" href="/tags/%E5%B9%B6%E5%8F%91%E7%BC%96%E7%A8%8B/" rel="tag">并发编程</a>
+  </span>
+
+
+        
+
+        <span class="post-comment"><i class="icon icon-comment"></i> <a href="/2021/06/14/%E5%B9%B6%E5%8F%91%E7%BC%96%E7%A8%8B%20JMM%E6%A8%A1%E5%9E%8B%E5%92%8Cvolatile/#comments" class="article-comment-link">评论</a></span>
+        
+      </div>
+    </div>
+    <div class="article-entry marked-body" itemprop="articleBody">
+      
+        <h1 id="计算机硬件结构"><a href="#计算机硬件结构" class="headerlink" title="计算机硬件结构"></a>计算机硬件结构</h1><img src="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20210529230500.png" alt="image-20210529230500500" style="zoom: 50%;" />
+
+
+
+<img src="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20210530152701.png" alt="image-20210530152701439" style="zoom:50%;" />
+
+<h2 id="多CPU"><a href="#多CPU" class="headerlink" title="多CPU"></a>多CPU</h2><p>一个现代CPU除了处理器核心之外还包括寄存器、L1L2L3缓存这些存储设备、浮点运算单元、整数运算单元等一些辅助运算设备以及内部总线等。</p>
+<p><strong>一个多核的CPU也就是一个CPU上有多个处理器核心</strong>。比如说现在我们要在一台计算机上跑一个多线程的程序，因为是一个进程里的线程，所以需要一些共享一些存储变量，如果这台计算机都是单核单线程CPU的话，就意味着这个程序的不同线程需要经常在CPU之间的外部总线上通信，同时还要处理不同CPU之间不同缓存导致数据不一致的问题，所以在这种场景下<strong>多核单CPU的架构能发挥很大的优势，通信都在内部总线，共用同一个缓存。</strong></p>
+<h2 id="CPU寄存器"><a href="#CPU寄存器" class="headerlink" title="CPU寄存器"></a>CPU寄存器</h2><p>每个CPU都包含一系列的寄存器，它们是CPU内内存的基础。<strong>CPU在寄存器上执行操作的速度远大于在主存上执行的速度</strong>。这是因为CPU访问寄存器的速度远大于主存。</p>
+<h2 id="CPU缓存"><a href="#CPU缓存" class="headerlink" title="CPU缓存"></a>CPU缓存</h2><p><strong>即高速缓冲存储器，是位于CPU与主内存间的一种容量较小但速度很高的存储器</strong>。</p>
+<p>它的容量比内存小的多但是交换速度却比内存要快得多。<strong>CPU高速缓存的出现主要是为了解决CPU运算速度与内存读写速度不匹配的矛盾</strong>，因为CPU运算速度要比内存读写速度快很多，这样会使CPU花费很长时间等待数据到来或把数据写入内存。在缓存中的数据是内存中的一小部分，但这一小部分是短时间内CPU即将访问的，当CPU调用大量数据时，就可先缓存中调用，从而加快读取速度。</p>
+<p>当CPU要读取一个数据时，首先从一级缓存中查找，如果没有找到再从二级缓存中查找，如果还是没有就从三级缓存或内存中查找。一般来说，每级缓存的命中率大概都在80%左右，也就是说全部数据量的80%都可以在一级缓存中找到，只剩下20%的总数据量才需要从二级缓存、三级缓存或内存中读取，由此可见一级缓存是整个CPU缓存架构中最为重要的部分。</p>
+<h2 id="内存"><a href="#内存" class="headerlink" title="内存"></a>内存</h2><p>一个计算机还包含一个主存。所有的CPU都可以访问主存。主存通常比CPU中的缓存大得 多。</p>
+<h3 id="CPU读取存储器数据过程"><a href="#CPU读取存储器数据过程" class="headerlink" title="CPU读取存储器数据过程"></a>CPU读取存储器数据过程</h3><ul>
+<li> CPU取寄存器XX的值，只需要一步:直接读取。</li>
+<li> CPU取L1 cache的某个值，需要把cache行锁住，把某个数据拿来，解锁。</li>
+<li> CPU取L2 cache的某个值，先要到L1 cache里取，L1当中不存在，在L2里，L2开始加锁，加锁以后，把L2里的数据复制到L1，再执行读L1的过程，上面的3步，再解锁。 </li>
+<li>CPU取L3 cache的也是一样，只不过先由L3复制到L2，从L2复制到L1，从L1到CPU。</li>
+<li>CPU取内存则最复杂，通知内存控制器占用总线带宽，通知内存加锁，发起内存读请求，等待回应，回应数据保存到L3(如果没有就到L2)，再从L3/2到L1，再从L1到CPU，之后解除总线锁定。</li>
+</ul>
+<h3 id="缓存一致性问题"><a href="#缓存一致性问题" class="headerlink" title="缓存一致性问题"></a>缓存一致性问题</h3><p> 缓存一致性问题 在多处理器系统中，每个处理器都有自己的高速缓存，而它们又共享同一主内存(MainMemory)。基于高速缓存的存储交互很好地解决了处理器与内存的速度矛盾，但是 也引入了新的问题:缓存一致性(CacheCoherence)。当多个处理器的运算任务都涉及同一块主内存区域时，将可能导致各自的缓存数据不一致的情况，如果真的发生这种情况，那同步回到主内存时以谁的缓存数据为准呢?<strong>为了解决一致性的问题，需要各个处理器访问缓存时都遵循一些协议，在读写时要根据协议来进行操作</strong>，这类协议有MSI、 MESI(IllinoisProtocol)、MOSI、Synapse、Firefly及DragonProtocol，等等</p>
+<h3 id="指令重排问题"><a href="#指令重排问题" class="headerlink" title="指令重排问题"></a>指令重排问题</h3><p>为了使得处理器内部的运算单元能尽量被充分利用，处理器可能会对输入代码进行乱序执行(Out-Of-Order Execution)优化，处理器会在计算之后将乱序执行的结果重组，保证该结果与顺序执行的结果是一致的，但并不保证程序中各个语句计算的先后顺序与输入代码中的 顺序一致。因此，如果存在一个计算任务依赖另一个计算任务的中间结果，那么其顺序性并不能靠代码的先后顺序来保证。与处理器的乱序执行优化类似，Java虚拟机的即时编译器中也有类似的指令重排序(Instruction Reorder)优化</p>
+<h1 id="多线程"><a href="#多线程" class="headerlink" title="多线程"></a>多线程</h1><h2 id="用户线程"><a href="#用户线程" class="headerlink" title="用户线程"></a>用户线程</h2><p>指不需要内核支持而在用户程序中实现的线程，其不依赖于操作系统核心，应 用进程利用线程库提供创建、同步、调度和管理线程的函数来控制用户线程。另外，用户线程 是由应用进程利用线程库创建和管理，不依赖于操作系统核心。不需要用户态/核心态切换， 速度快。操作系统内核不知道多线程的存在，因此一个线程阻塞将使得整个进程(包括它的所 有线程)阻塞。由于这里的处理器时间片分配是以进程为基本单位，所以每个线程执行的时间 相对减少。</p>
+<h2 id="内核线程"><a href="#内核线程" class="headerlink" title="内核线程"></a>内核线程</h2><p>线程的所有管理操作都是由操作系统内核完成的。内核保存线程的状态和上下 文信息，当一个线程执行了引起阻塞的系统调用时，内核可以调度该进程的其他线程执行。在 多处理器系统上，内核可以分派属于同一进程的多个线程在多个处理器上运行，提高进程执行 的并行度。由于需要内核完成线程的创建、调度和管理，所以和用户级线程相比这些操作要慢 得多，但是仍然比进程的创建和管理操作要快。</p>
+<h2 id="线程生命周期"><a href="#线程生命周期" class="headerlink" title="线程生命周期"></a>线程生命周期</h2><img src="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20210530193840.png" alt="image-20210530193840326" style="zoom:50%;" />
+
+
+
+
+
+<h2 id="上下文切换"><a href="#上下文切换" class="headerlink" title="上下文切换"></a>上下文切换</h2><p>CPU通过时间片分配算法来循环执行任务，当前任务执行一个时间片后会切换到下一个 任务。但是，在切换前会保存上一个任务的状态，以便下次切换回这个任务时，可以再加载这个任务的状态。所以任务从保存到再加载的过程就是一次上下文切换。</p>
+<img src="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20210610151337.png" alt="image-20210610151337021" style="zoom:50%;" />
+
+<h1 id="JMM模型"><a href="#JMM模型" class="headerlink" title="JMM模型"></a>JMM模型</h1><p><strong>JMM决定一个线程对共享变量的写入何时对另一个线程可见</strong>。从抽象的角度来看，JMM定义了线程和主内存之间的抽象关系：<strong>线程之间的共享变量存储在主内存）中，每个线程都有一个私有的本地内存，本地内存中存储了该线程以读/写共享变量的副本</strong></p>
+<p>JVM运行程序的实体是线程，而每个线程创建时JVM都会为其创建一个工作内存(有些地方称为栈空间)，用于存储线程私有的数据。Java内存模型中规定所有变量都存储在主内存，主内存是共享内存区域，所有线程都可以访问。</p>
+<p>但线程对变量的操作必须在工作内存中进行，所以首先要将变量从主内存拷贝的自己的工作内存空间，然后对变量进行操作，操作完成后再将变量写回主内存，不能直接操作主内存中的变量， 工作内存中存储着主内存中的变量副本拷贝。</p>
+<p>工作内存是每个线程的私有数据区域，因此不同的线程间无法访问对方的工作内存，线程间的通信(传值)必须通过主内存来完成。</p>
+<img src="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20210610154417.png" alt="image-20210610154416961" style="zoom:50%;" />
+
+
+
+<h2 id="八种操作"><a href="#八种操作" class="headerlink" title="八种操作"></a>八种操作</h2><ul>
+<li>lock(锁定):作用于主内存的变量，把一个变量标记为一条线程独占状态 </li>
+<li>unlock(解锁):作用于主内存的变量，把一个处于锁定状态的变量释放出来，释放后的 变量才可以被其他线程锁定 </li>
+<li>read(读取):作用于主内存的变量，把一个变量值从主内存传输到线程的工作内存中， 以便随后的load动作使用 </li>
+<li>load(载入):作用于工作内存的变量，它把read操作从主内存中得到的变量值放入工作 内存的变量副本中 </li>
+<li>use(使用):作用于工作内存的变量，把工作内存中的一个变量值传递给执行引擎 </li>
+<li>assign(赋值):作用于工作内存的变量，它把一个从执行引擎接收到的值赋给工作内存 的变量</li>
+<li>store(存储):作用于工作内存的变量，把工作内存中的一个变量的值传送到主内存中， 以便随后的write的操作 </li>
+<li>write(写入):作用于工作内存的变量，它把store操作从工作内存中的一个变量的值传送 到主内存的变量中</li>
+</ul>
+<img src="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20210610172617.png" alt="image-20210610172617926" style="zoom:50%;" />
+
+<h1 id="并发编程三大特性"><a href="#并发编程三大特性" class="headerlink" title="并发编程三大特性"></a>并发编程三大特性</h1><p><strong>原子性：原子性指的是一个操作是不可中断的，即使是在多线程环境下，一个操作一旦开始就不会被其他线程影响。</strong></p>
+<blockquote>
+<p>除了JVM自身提供的对基本数据类型读写操作的原子性外，可以通过 synchronized和 Lock实现原子性。因为synchronized和Lock能够保证任一时刻只有一个线程访问该代码块。</p>
+</blockquote>
+<p><strong>可见性：可见性指的是当一个线程修改了某个共享变量的值，其他线程是否能够马上得知这个修改的值。</strong></p>
+<p><em>由于线程对共享变量的操作都是线程拷贝到各自的工作内存进行操作后才写回到主内存中的，这就可能存在一个线程A修改了共享变量x的值，还未写回主内存时，另外一个线程B又对主内存中同一个共享变量x进行操作，但 此时A线程工作内存中共享变量x对线程B来说并不可见，这种工作内存与主内存同步延迟现象就造成了可见性问题。</em></p>
+<blockquote>
+<p>volatile关键字保证可见性。当一个共享变量被volatile修饰时，它会保证修改的值立即被 其他的线程看到，即修改的值立即更新到主存中，当其他线程需要读取时，它会去内存中读取新值。synchronized和Lock也可以保证可见性，因为它们可以保证任一时刻只有一个线程能访问共享资源，并在其释放锁之前将修改的变量刷新到内存中。</p>
+</blockquote>
+<p><em>另外指令重排以及编译器优化也可能导致可见性问题，无论是编译器优化还是处理器优化的重排现象，在多线程环境下，确实会导致程 序轮序执行的问题，从而也就导致可见性问题。</em></p>
+<p><strong>有序性：有序性是指对于单线程的执行代码，我们总是认为代码的执行是按顺序依次执行的，这样的理解并没有毛病，毕竟对于单线程而言确实如此，但对于多线程环境，则可能出现乱序现象，因为程序编译成机器码指令后可能会出现指令重排现象，重排后的指令与原指令的顺序未必一致。</strong></p>
+<p>要明白的是，在Java程序中，倘若在本线程内，所有操作都视为有序行为，如果是多线程环境下，一个线程中观察另外一个线程，所有操作都是无序的，前半句指的是单线程内保证串行语义执行的一致性，后半句则指指令重排现象和工作内存与主内存同步延迟现象。</p>
+<blockquote>
+<p>在Java里面，可以通过volatile关键字来保证一定的“有序性”(具体原理在下一节讲述 volatile关键字)。另外可以通过synchronized和Lock来保证有序性，很显然，synchronized 和Lock保证每个时刻是有一个线程执行同步代码，相当于是让线程顺序执行同步代码，自然就 保证了有序性。</p>
+</blockquote>
+<h1 id="volatile"><a href="#volatile" class="headerlink" title="volatile"></a>volatile</h1><p>volatile是Java虚拟机提供的轻量级的同步机制。volatile关键字有如下两个作用 </p>
+<ul>
+<li>保证被volatile修饰的共享变量对所有线程总数可见的，也就是当一个线程修改了一个被volatile修饰共享变量的值，新值总是可以被其他线程立即得知。 </li>
+<li>禁止指令重排序优化。</li>
+</ul>
+<h2 id="volatile无法保证原子性"><a href="#volatile无法保证原子性" class="headerlink" title="volatile无法保证原子性"></a>volatile无法保证原子性</h2><p>volatile只能保证可见性，原子性可以使用synchronized保证。需要注意的是一旦使用synchronized修饰方法后，由于synchronized本身也具备与volatile相同的特性，即可见性，因此在这样种情况下就可以省去volatile修饰变量。</p>
+<h2 id="volatile禁止重排优化"><a href="#volatile禁止重排优化" class="headerlink" title="volatile禁止重排优化"></a>volatile禁止重排优化</h2><p>volatile关键字另一个作用就是禁止指令重排优化，从而避免多线程环境下程序出现乱序执行的现象。</p>
+<h2 id="内存屏障"><a href="#内存屏障" class="headerlink" title="内存屏障"></a>内存屏障</h2><p>内存屏障，又称内存栅栏，是一个CPU指令，它的作用有两个：</p>
+<ul>
+<li>保证特定操作的执行顺序</li>
+<li>保证某些变量的内存可见性(利用该特性实现volatile的内存可见性)。</li>
+</ul>
+<p>由于编译器和处理器都能执行指令重排优化。如果在指令间插入一条Memory Barrier则会告诉编译器 和CPU，不管什么指令都不能和这条Memory Barrier指令重排序，也就是说通过插入内存屏障禁止在内存屏障前后的指令执行重排序优化。Memory Barrier的另外一个作用是强制刷出各种CPU的缓存数据，因此任何CPU上的线程都能读取到这些数据的最新版本。总之， <strong>volatile变量正是通过内存屏障实现其在内存中的语义，即可见性和禁止重排优化。</strong></p>
+<h2 id="DCL单例模式"><a href="#DCL单例模式" class="headerlink" title="DCL单例模式"></a>DCL单例模式</h2><p>DCL：Double Check Lock</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line"></span><br><span class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">class</span> <span class="title">Singleton</span> </span>&#123;</span><br><span class="line">    <span class="keyword">private</span> <span class="keyword">static</span> <span class="keyword">volatile</span> Singleton instance;</span><br><span class="line">    <span class="function"><span class="keyword">private</span> <span class="title">Singleton</span><span class="params">()</span> </span>&#123;&#125;</span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="keyword">static</span> Singleton <span class="title">getInstance</span><span class="params">()</span> </span>&#123;</span><br><span class="line">        <span class="keyword">if</span> (instance == <span class="keyword">null</span>) &#123; <span class="comment">// 1</span></span><br><span class="line">            <span class="keyword">synchronized</span> (Singleton.class) &#123; </span><br><span class="line">                <span class="keyword">if</span> (instance == <span class="keyword">null</span>) &#123; <span class="comment">// 2</span></span><br><span class="line">                    instance = <span class="keyword">new</span> Singleton();</span><br><span class="line">                &#125;</span><br><span class="line">            &#125;</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="keyword">return</span> instance;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p><a target="_blank" rel="noopener" href="https://blog.csdn.net/qq_26817225/article/details/107215878">https://blog.csdn.net/qq_26817225/article/details/107215878</a></p>
+<p>volatile在DCL单例中不是使用它的线程可见性，而是禁止指令重排序。</p>
+<h3 id="对象的创建过程"><a href="#对象的创建过程" class="headerlink" title="对象的创建过程"></a>对象的创建过程</h3><p><strong>结论：对象的创建不是原子性操作，所以有指令重排序的可能。为了禁止指令重排序，所以要引入volatile。</strong></p>
+<p>初始化一个对象 instance = new DoubleCheckLock()；可以分为以下3步完成(伪代码)</p>
+<ol>
+<li><p>申请对象内存空间 </p>
+<p>memory = allocate();</p>
+</li>
+<li><p>初始化对象（比如int a = 5等）</p>
+<p> instance(memory);</p>
+</li>
+<li><p>设置instance指向刚申请的内存地址， instance!=null</p>
+<p> instance = memory;</p>
+</li>
+</ol>
+<p>由于步骤2和步骤3间可能会重排序，如下:</p>
+<ol>
+<li><p>申请对象内存空间 </p>
+<p>memory = allocate();</p>
+</li>
+<li><p>设置instance指向刚申请的内存地址， instance!=null，<strong>但是对象还没有初始化完成!</strong></p>
+<p> instance = memory;</p>
+</li>
+<li><p>初始化对象（比如int a = 5等）</p>
+<p> instance(memory);</p>
+</li>
+</ol>
+<p>由于步骤2和步骤3不存在数据依赖关系，而且无论重排前还是重排后程序的执行结果在单线程中并没有改变，因此这种重排优化是允许的。</p>
+<p>但是指令重排只会保证串行语义的执行的一致性(单线程)，但并不会关心多线程间的语义一致性。所以当一条线程访问instance不为null 时，由于instance实例未必已初始化完成，也就造成了线程安全问题。那么该如何解决呢，使用volatile禁止instance变量被执行指令重排优化即可。</p>
+<h2 id="volatile内存屏障"><a href="#volatile内存屏障" class="headerlink" title="volatile内存屏障"></a>volatile内存屏障</h2><p>下图是JMM针对编译器制定的volatile重排序规则表。</p>
+<img src="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20210614214520.png" alt="image-20210614214520297" style="zoom:50%;" />
+
+
+
+<ul>
+<li>当第二个操作是volatile写时，不管第一个操作是什么，都不能重排序。这个规则确保 volatile写之前的操作不会被编译器重排序到volatile写之后。</li>
+<li>当第一个操作是volatile读时，不管第二个操作是什么，都不能重排序。这个规则确保 volatile读之后的操作不会被编译器重排序到volatile读之前。</li>
+<li>当第一个操作是volatile写，第二个操作是volatile读时，不能重排序。</li>
+</ul>
+<p>JMM采取保守策略。下面是基于保守策略的JMM内存屏障插入策略。</p>
+<ul>
+<li>在每个volatile写操作的前面插入一个StoreStore屏障，后面插入一个StoreLoad屏障。</li>
+<li>在每个volatile读操作的后面插入一个LoadLoad屏障和一个LoadStore屏障。</li>
+</ul>
+<p><strong>这种xy形式的指令，其语义如下：在xy之前的x操作，不能与xy之后的y操作进行重排序。</strong></p>
+<p>下面是保守策略下，volatile写插入内存屏障后生成的指令序列示意图</p>
+<img src="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20210614220605.png" alt="image-20210614220605243" style="zoom:50%;" />
+
+<p>StoreStore屏障可以保证在volatile写之前，其前面的所有普通写操作已经对任意 处理器可见了。这是因为StoreStore屏障将保障上面所有的普通写在volatile写之前刷新到主内存。</p>
+<p>volatile写后面的StoreLoad屏障。此屏障的作用是避免 volatile写与后面可能有的volatile读/写操作重排序。因为编译器常常无法准确判断在 一个volatile写的后面 是否需要插入一个StoreLoad屏障(比如，一个volatile写之后方 法立即return)，所以基于保守策略，在每个volatile写的后面，或者在每个volatile 读的前面插入一个StoreLoad屏障。</p>
+<p>下图是在保守策略下，volatile读插入内存屏障后生成的指令序列示意图</p>
+<img src="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20210614224731.png" alt="image-20210614224731676" style="zoom:50%;" />
+
+      
+    </div>
+    <div class="article-footer">
+      <blockquote class="mt-2x">
+  <ul class="post-copyright list-unstyled">
+    
+    <li class="post-copyright-link hidden-xs">
+      <strong>本文链接：</strong>
+      <a href="https://tj-ever.github.io/2021/06/14/%E5%B9%B6%E5%8F%91%E7%BC%96%E7%A8%8B%20JMM%E6%A8%A1%E5%9E%8B%E5%92%8Cvolatile/" title="并发编程 JMM模型和volatile" target="_blank" rel="external">https://tj-ever.github.io/2021/06/14/并发编程 JMM模型和volatile/</a>
+    </li>
+    
+    <li class="post-copyright-license">
+      <strong>版权声明： </strong> 本博客所有文章除特别声明外，均采用 <a href="http://creativecommons.org/licenses/by/4.0/deed.zh" target="_blank" rel="external">CC BY 4.0 CN协议</a> 许可协议。转载请注明出处！
+    </li>
+  </ul>
+</blockquote>
+
+
+<div class="panel panel-default panel-badger">
+  <div class="panel-body">
+    <figure class="media">
+      <div class="media-left">
+        <a href="https://github.com/cofess" target="_blank" class="img-burn thumb-sm visible-lg">
+          <img src="/images/avatar.jpg" class="img-rounded w-full" alt="">
+        </a>
+      </div>
+      <div class="media-body">
+        <h3 class="media-heading"><a href="https://github.com/cofess" target="_blank"><span class="text-dark">Ever</span><small class="ml-1x">Ever的个人博客</small></a></h3>
+        <div>啊啊啊啊这功能做不了。</div>
+      </div>
+    </figure>
+  </div>
+</div>
+
+
+    </div>
+  </article>
+  
+    
+  <section id="comments">
+  	
+      <div id="vcomments"></div>
+    
+  </section>
+
+
+  
+</div>
+
+  <nav class="bar bar-footer clearfix" data-stick-bottom>
+  <div class="bar-inner">
+  
+  <ul class="pager pull-left">
+    
+    <li class="prev">
+      <a href="/2021/06/17/%E5%B9%B6%E5%8F%91%E7%BC%96%E7%A8%8B%20synchronized&Lock&AQS/" title="并发编程 Synchronized&amp;Lock&amp;AQS"><i class="icon icon-angle-left" aria-hidden="true"></i><span>&nbsp;&nbsp;上一篇</span></a>
+    </li>
+    
+    
+    <li class="next">
+      <a href="/2020/12/02/Docker%E5%AE%B9%E5%99%A8%E8%BF%81%E7%A7%BB%EF%BC%8C%E5%A4%87%E4%BB%BD/" title="docker容器迁移，备份"><span>下一篇&nbsp;&nbsp;</span><i class="icon icon-angle-right" aria-hidden="true"></i></a>
+    </li>
+    
+    
+  </ul>
+  
+  
+  <!-- Button trigger modal -->
+  <button type="button" class="btn btn-fancy btn-donate pop-onhover bg-gradient-warning" data-toggle="modal" data-target="#donateModal"><span>赏</span></button>
+  <!-- <div class="wave-icon wave-icon-danger btn-donate" data-toggle="modal" data-target="#donateModal">
+    <div class="wave-circle"><span class="icon"><i class="icon icon-bill"></i></span></div>
+  </div> -->
+  
+  
+  <div class="bar-right">
+    
+    <div class="share-component" data-sites="weibo,qq,wechat,facebook,twitter" data-mobile-sites="weibo,qq,qzone"></div>
+    
+  </div>
+  </div>
+</nav>
+  
+<!-- Modal -->
+<div class="modal modal-center modal-small modal-xs-full fade" id="donateModal" tabindex="-1" role="dialog">
+  <div class="modal-dialog" role="document">
+    <div class="modal-content donate">
+      <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+      <div class="modal-body">
+        <div class="donate-box">
+          <div class="donate-head">
+            <p>感谢您的支持，我会继续努力的!</p>
+          </div>
+          <div class="tab-content">
+            <div role="tabpanel" class="tab-pane fade active in" id="alipay">
+              <div class="donate-payimg">
+                <img src="/images/donate/alipayimg.png" alt="扫码支持" title="扫一扫" />
+              </div>
+              <p class="text-muted mv">扫码打赏，你说多少就多少</p>
+              <p class="text-grey">打开支付宝扫一扫，即可进行扫码打赏哦</p>
+            </div>
+            <div role="tabpanel" class="tab-pane fade" id="wechatpay">
+              <div class="donate-payimg">
+                <img src="/images/donate/wechatpayimg.png" alt="扫码支持" title="扫一扫" />
+              </div>
+              <p class="text-muted mv">扫码打赏，你说多少就多少</p>
+              <p class="text-grey">打开微信扫一扫，即可进行扫码打赏哦</p>
+            </div>
+          </div>
+          <div class="donate-footer">
+            <ul class="nav nav-tabs nav-justified" role="tablist">
+              <li role="presentation" class="active">
+                <a href="#alipay" id="alipay-tab" role="tab" data-toggle="tab" aria-controls="alipay" aria-expanded="true"><i class="icon icon-alipay"></i> 支付宝</a>
+              </li>
+              <li role="presentation" class="">
+                <a href="#wechatpay" role="tab" id="wechatpay-tab" data-toggle="tab" aria-controls="wechatpay" aria-expanded="false"><i class="icon icon-wepay"></i> 微信支付</a>
+              </li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+
+</main>
+
+  <footer class="footer" itemscope itemtype="http://schema.org/WPFooter">
+	
+	
+    <ul class="social-links">
+    	
+        <li><a href="https://weibo.com/u/2735829887" target="_blank" title="Weibo" data-toggle=tooltip data-placement=top><i class="icon icon-weibo"></i></a></li>
+        
+    </ul>
+
+    <div class="copyright">
+    	
+        <div class="publishby">
+        	Theme by <a href="https://github.com/cofess" target="_blank"> cofess </a>base on <a href="https://github.com/cofess/hexo-theme-pure" target="_blank">pure</a>.
+        </div>
+    </div>
+</footer>
+  <script src="//cdn.jsdelivr.net/npm/jquery@1.12.4/dist/jquery.min.js"></script>
+<script>
+window.jQuery || document.write('<script src="js/jquery.min.js"><\/script>')
+</script>
+
+<script src="/js/plugin.min.js"></script>
+
+
+<script src="/js/application.js"></script>
+
+
+    <script>
+(function (window) {
+    var INSIGHT_CONFIG = {
+        TRANSLATION: {
+            POSTS: '文章',
+            PAGES: '页面',
+            CATEGORIES: '分类',
+            TAGS: '标签',
+            UNTITLED: '(未命名)',
+        },
+        ROOT_URL: '/',
+        CONTENT_URL: '/content.json',
+    };
+    window.INSIGHT_CONFIG = INSIGHT_CONFIG;
+})(window);
+</script>
+
+<script src="/js/insight.js"></script>
+
+
+
+
+
+
+   
+
+
+
+
+   
+    
+  <script src="//cdn1.lncld.net/static/js/3.0.4/av-min.js"></script>
+  <script src="//cdn.jsdelivr.net/npm/valine"></script>
+  <script type="text/javascript">
+  var GUEST = ['nick', 'mail', 'link'];
+  var meta = 'nick,mail,link';
+  meta = meta.split(',').filter(function(item) {
+    return GUEST.indexOf(item) > -1;
+  });
+  new Valine({
+    el: '#vcomments',
+    verify: false,
+    notify: false,
+    appId: '',
+    appKey: '',
+    placeholder: 'Just go go',
+    avatar: 'mm',
+    meta: meta,
+    pageSize: '10' || 10,
+    visitor: false
+  });
+  </script>
+
+     
+
+
+
+
+
+
+
+</body>
+</html>
