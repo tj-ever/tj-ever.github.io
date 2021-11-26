@@ -1,0 +1,932 @@
+<!DOCTYPE html>
+<html lang=zh>
+<head>
+  <meta charset="utf-8">
+  
+  <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no, minimal-ui">
+  <meta name="renderer" content="webkit">
+  <meta http-equiv="Cache-Control" content="no-transform" />
+  <meta http-equiv="Cache-Control" content="no-siteapp" />
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <meta name="format-detection" content="telephone=no,email=no,adress=no">
+  <!-- Color theme for statusbar -->
+  <meta name="theme-color" content="#000000" />
+  <!-- 强制页面在当前窗口以独立页面显示,防止别人在框架里调用页面 -->
+  <meta http-equiv="window-target" content="_top" />
+  
+  
+  <title>Kafka 基本原理 | Ever的个人博客</title>
+  <meta name="description" content="Kafka是最初由Linkedin公司开发，是一个分布式、支持分区的(partition)、多副本的(replica)，基于zookeeper协调的分布式消息系统，它的最大的特性就是可以实时的处理大量数据以满足各种需求场景:比如基于hadoop的批处理系统、低延迟的实时系统、Storm&#x2F;Spark流式处理引擎，web&#x2F;nginx日志、访问日志，消息服务等等，用scala语言编写， Linkedin">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Kafka 基本原理">
+<meta property="og:url" content="https://tj-ever.github.io/2021/11/22/Kafka%E5%9F%BA%E7%A1%80%E5%8E%9F%E7%90%86/index.html">
+<meta property="og:site_name" content="Ever的个人博客">
+<meta property="og:description" content="Kafka是最初由Linkedin公司开发，是一个分布式、支持分区的(partition)、多副本的(replica)，基于zookeeper协调的分布式消息系统，它的最大的特性就是可以实时的处理大量数据以满足各种需求场景:比如基于hadoop的批处理系统、低延迟的实时系统、Storm&#x2F;Spark流式处理引擎，web&#x2F;nginx日志、访问日志，消息服务等等，用scala语言编写， Linkedin">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20211122140710.png">
+<meta property="og:image" content="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20211122140856.png">
+<meta property="og:image" content="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20211122141159.png">
+<meta property="og:image" content="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20211122145133.png">
+<meta property="og:image" content="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20211122145608.png">
+<meta property="og:image" content="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20211122173445.png">
+<meta property="og:image" content="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20211122181507.png">
+<meta property="og:image" content="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20211122181817.png">
+<meta property="og:image" content="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20211122181836.png">
+<meta property="og:image" content="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20211123102753.png">
+<meta property="og:image" content="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20211123102902.png">
+<meta property="og:image" content="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20211123103929.png">
+<meta property="og:image" content="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20211123104138.png">
+<meta property="og:image" content="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20211123104831.png">
+<meta property="article:published_time" content="2021-11-21T16:00:00.000Z">
+<meta property="article:modified_time" content="2021-11-25T05:34:14.631Z">
+<meta property="article:author" content="Ever">
+<meta property="article:tag" content="Kafka">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20211122140710.png">
+  <!-- Canonical links -->
+  <link rel="canonical" href="https://tj-ever.github.io/2021/11/22/Kafka%E5%9F%BA%E7%A1%80%E5%8E%9F%E7%90%86/index.html">
+  
+    <link rel="alternate" href="/atom.xml" title="Ever的个人博客" type="application/atom+xml">
+  
+  
+    <link rel="icon" href="/favicon.png" type="image/x-icon">
+  
+  
+<link rel="stylesheet" href="/css/style.css">
+
+  
+  
+  
+  
+<meta name="generator" content="Hexo 5.2.0"></head>
+
+
+<body class="main-center" itemscope itemtype="http://schema.org/WebPage">
+  <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+  <div class="slimContent">
+    <div class="navbar-header">
+      
+      
+      <div class="profile-block text-center">
+        <a id="avatar" href="https://github.com/cofess" target="_blank">
+          <img class="img-circle img-rotate" src="/images/avatar.jpg" width="200" height="200">
+        </a>
+        <h2 id="name" class="hidden-xs hidden-sm">Ever</h2>
+        <h3 id="title" class="hidden-xs hidden-sm hidden-md">Ever的个人博客</h3>
+        <small id="location" class="text-muted hidden-xs hidden-sm"><i class="icon icon-map-marker"></i> Xian, China</small>
+      </div>
+      
+      <div class="search" id="search-form-wrap">
+
+    <form class="search-form sidebar-form">
+        <div class="input-group">
+            <input type="text" class="search-form-input form-control" placeholder="搜索" />
+            <span class="input-group-btn">
+                <button type="submit" class="search-form-submit btn btn-flat" onclick="return false;"><i class="icon icon-search"></i></button>
+            </span>
+        </div>
+    </form>
+    <div class="ins-search">
+  <div class="ins-search-mask"></div>
+  <div class="ins-search-container">
+    <div class="ins-input-wrapper">
+      <input type="text" class="ins-search-input" placeholder="想要查找什么..." x-webkit-speech />
+      <button type="button" class="close ins-close ins-selectable" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">×</span></button>
+    </div>
+    <div class="ins-section-wrapper">
+      <div class="ins-section-container"></div>
+    </div>
+  </div>
+</div>
+
+
+</div>
+      <button class="navbar-toggle collapsed" type="button" data-toggle="collapse" data-target="#main-navbar" aria-controls="main-navbar" aria-expanded="false">
+        <span class="sr-only">Toggle navigation</span>
+        <span class="icon-bar"></span>
+        <span class="icon-bar"></span>
+        <span class="icon-bar"></span>
+      </button>
+    </div>
+    <nav id="main-navbar" class="collapse navbar-collapse" itemscope itemtype="http://schema.org/SiteNavigationElement" role="navigation">
+      <ul class="nav navbar-nav main-nav ">
+        
+        
+        <li class="menu-item menu-item-home">
+          <a href="/.">
+            
+            <i class="icon icon-home-fill"></i>
+            
+            <span class="menu-title">首页</span>
+          </a>
+        </li>
+        
+        
+        <li class="menu-item menu-item-archives">
+          <a href="/archives">
+            
+            <i class="icon icon-archives-fill"></i>
+            
+            <span class="menu-title">归档</span>
+          </a>
+        </li>
+        
+        
+        <li class="menu-item menu-item-categories">
+          <a href="/categories">
+            
+            <i class="icon icon-folder"></i>
+            
+            <span class="menu-title">分类</span>
+          </a>
+        </li>
+        
+        
+        <li class="menu-item menu-item-tags">
+          <a href="/tags">
+            
+            <i class="icon icon-tags"></i>
+            
+            <span class="menu-title">标签</span>
+          </a>
+        </li>
+        
+        
+        <li class="menu-item menu-item-repository">
+          <a href="/repository">
+            
+            <i class="icon icon-project"></i>
+            
+            <span class="menu-title">项目</span>
+          </a>
+        </li>
+        
+        
+        <li class="menu-item menu-item-books">
+          <a href="/books">
+            
+            <i class="icon icon-book-fill"></i>
+            
+            <span class="menu-title">书单</span>
+          </a>
+        </li>
+        
+        
+        <li class="menu-item menu-item-links">
+          <a href="/links">
+            
+            <i class="icon icon-friendship"></i>
+            
+            <span class="menu-title">友链</span>
+          </a>
+        </li>
+        
+        
+        <li class="menu-item menu-item-about">
+          <a href="/about">
+            
+            <i class="icon icon-cup-fill"></i>
+            
+            <span class="menu-title">关于</span>
+          </a>
+        </li>
+        
+      </ul>
+      
+	
+    <ul class="social-links">
+    	
+        <li><a href="https://weibo.com/u/2735829887" target="_blank" title="Weibo" data-toggle=tooltip data-placement=top><i class="icon icon-weibo"></i></a></li>
+        
+    </ul>
+
+    </nav>
+  </div>
+</header>
+
+  
+    <aside class="sidebar" itemscope itemtype="http://schema.org/WPSideBar">
+  <div class="slimContent">
+    
+      <div class="widget">
+    <h3 class="widget-title">公告</h3>
+    <div class="widget-body">
+        <div id="board">
+            <div class="content">
+                <p>qq:&nbsp471958719</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+    
+      
+
+    
+      
+  <div class="widget">
+    <h3 class="widget-title">标签</h3>
+    <div class="widget-body">
+      <ul class="tag-list" itemprop="keywords"><li class="tag-list-item"><a class="tag-list-link" href="/tags/JVM/" rel="tag">JVM</a><span class="tag-list-count">4</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/JVM-Arthas/" rel="tag">JVM Arthas</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Kafka/" rel="tag">Kafka</a><span class="tag-list-count">3</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/MySQL/" rel="tag">MySQL</a><span class="tag-list-count">5</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Zookeeper/" rel="tag">Zookeeper</a><span class="tag-list-count">3</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/docker/" rel="tag">docker</a><span class="tag-list-count">3</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/hashmap/" rel="tag">hashmap</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/k8s/" rel="tag">k8s</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/linux/" rel="tag">linux</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/oracle/" rel="tag">oracle</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/rabbitmq/" rel="tag">rabbitmq</a><span class="tag-list-count">3</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/redis/" rel="tag">redis</a><span class="tag-list-count">3</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/sql/" rel="tag">sql</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E5%89%8D%E7%AB%AF/" rel="tag">前端</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E5%B9%B6%E5%8F%91%E7%BC%96%E7%A8%8B/" rel="tag">并发编程</a><span class="tag-list-count">7</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E7%8E%AF%E5%A2%83%E6%90%AD%E5%BB%BA/" rel="tag">环境搭建</a><span class="tag-list-count">1</span></li></ul>
+    </div>
+  </div>
+
+
+    
+      
+  <div class="widget">
+    <h3 class="widget-title">标签云</h3>
+    <div class="widget-body tagcloud">
+      <a href="/tags/JVM/" style="font-size: 13.5px;">JVM</a> <a href="/tags/JVM-Arthas/" style="font-size: 13px;">JVM Arthas</a> <a href="/tags/Kafka/" style="font-size: 13.25px;">Kafka</a> <a href="/tags/MySQL/" style="font-size: 13.75px;">MySQL</a> <a href="/tags/Zookeeper/" style="font-size: 13.25px;">Zookeeper</a> <a href="/tags/docker/" style="font-size: 13.25px;">docker</a> <a href="/tags/hashmap/" style="font-size: 13px;">hashmap</a> <a href="/tags/k8s/" style="font-size: 13px;">k8s</a> <a href="/tags/linux/" style="font-size: 13px;">linux</a> <a href="/tags/oracle/" style="font-size: 13px;">oracle</a> <a href="/tags/rabbitmq/" style="font-size: 13.25px;">rabbitmq</a> <a href="/tags/redis/" style="font-size: 13.25px;">redis</a> <a href="/tags/sql/" style="font-size: 13px;">sql</a> <a href="/tags/%E5%89%8D%E7%AB%AF/" style="font-size: 13px;">前端</a> <a href="/tags/%E5%B9%B6%E5%8F%91%E7%BC%96%E7%A8%8B/" style="font-size: 14px;">并发编程</a> <a href="/tags/%E7%8E%AF%E5%A2%83%E6%90%AD%E5%BB%BA/" style="font-size: 13px;">环境搭建</a>
+    </div>
+  </div>
+
+    
+      
+  <div class="widget">
+    <h3 class="widget-title">归档</h3>
+    <div class="widget-body">
+      <ul class="archive-list"><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/11/">十一月 2021</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/10/">十月 2021</a><span class="archive-list-count">8</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/09/">九月 2021</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/08/">八月 2021</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/07/">七月 2021</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/06/">六月 2021</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/12/">十二月 2020</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/11/">十一月 2020</a><span class="archive-list-count">6</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/10/">十月 2020</a><span class="archive-list-count">5</span></li></ul>
+    </div>
+  </div>
+
+
+    
+      
+  <div class="widget">
+    <h3 class="widget-title">最新文章</h3>
+    <div class="widget-body">
+      <ul class="recent-post-list list-unstyled no-thumbnail">
+        
+          <li>
+            
+            <div class="item-inner">
+              <p class="item-category">
+                
+              </p>
+              <p class="item-title">
+                <a href="/2021/11/26/Kafka%20%E7%94%9F%E4%BA%A7%E7%8E%AF%E5%A2%83%E9%97%AE%E9%A2%98%E5%8F%8A%E6%80%A7%E8%83%BD%E4%BC%98%E5%8C%96/" class="title">Kafka 生产环境问题及性能优化</a>
+              </p>
+              <p class="item-date">
+                <time datetime="2021-11-25T16:00:00.000Z" itemprop="datePublished">2021-11-26</time>
+              </p>
+            </div>
+          </li>
+          
+          <li>
+            
+            <div class="item-inner">
+              <p class="item-category">
+                
+              </p>
+              <p class="item-title">
+                <a href="/2021/11/25/Kafka%20%E8%AE%BE%E8%AE%A1%E5%8E%9F%E7%90%86/" class="title">Kafka 设计原理</a>
+              </p>
+              <p class="item-date">
+                <time datetime="2021-11-24T16:00:00.000Z" itemprop="datePublished">2021-11-25</time>
+              </p>
+            </div>
+          </li>
+          
+          <li>
+            
+            <div class="item-inner">
+              <p class="item-category">
+                
+              </p>
+              <p class="item-title">
+                <a href="/2021/11/22/Kafka%E5%9F%BA%E7%A1%80%E5%8E%9F%E7%90%86/" class="title">Kafka 基本原理</a>
+              </p>
+              <p class="item-date">
+                <time datetime="2021-11-21T16:00:00.000Z" itemprop="datePublished">2021-11-22</time>
+              </p>
+            </div>
+          </li>
+          
+          <li>
+            
+            <div class="item-inner">
+              <p class="item-category">
+                
+              </p>
+              <p class="item-title">
+                <a href="/2021/11/01/Rabbitmq%E5%AE%9E%E7%8E%B0%E6%B6%88%E6%81%AF%E5%8F%AF%E9%9D%A0%E6%80%A7%E6%8A%95%E9%80%92/" class="title">Rabbitmq 消息可靠性投递两种方案</a>
+              </p>
+              <p class="item-date">
+                <time datetime="2021-10-31T16:00:00.000Z" itemprop="datePublished">2021-11-01</time>
+              </p>
+            </div>
+          </li>
+          
+          <li>
+            
+            <div class="item-inner">
+              <p class="item-category">
+                
+              </p>
+              <p class="item-title">
+                <a href="/2021/10/25/Rabbitmq%20%E9%AB%98%E7%BA%A7%E7%89%B9%E6%80%A7%E5%8F%8A%E6%95%B4%E5%90%88springboot/" class="title">Rabbitmq 高级特性及整合springboot</a>
+              </p>
+              <p class="item-date">
+                <time datetime="2021-10-24T16:00:00.000Z" itemprop="datePublished">2021-10-25</time>
+              </p>
+            </div>
+          </li>
+          
+      </ul>
+    </div>
+  </div>
+  
+
+    
+  </div>
+</aside>
+
+  
+  
+<main class="main" role="main">
+  <div class="content">
+  <article id="post-Kafka基础原理" class="article article-type-post" itemscope itemtype="http://schema.org/BlogPosting">
+    
+    <div class="article-header">
+      
+        
+  
+    <h1 class="article-title" itemprop="name">
+      Kafka 基本原理
+    </h1>
+  
+
+      
+      <div class="article-meta">
+        <span class="article-date">
+    <i class="icon icon-calendar-check"></i>
+	<a href="/2021/11/22/Kafka%E5%9F%BA%E7%A1%80%E5%8E%9F%E7%90%86/" class="article-date">
+	  <time datetime="2021-11-21T16:00:00.000Z" itemprop="datePublished">2021-11-22</time>
+	</a>
+</span>
+        
+        
+  <span class="article-tag">
+    <i class="icon icon-tags"></i>
+	<a class="article-tag-link-link" href="/tags/Kafka/" rel="tag">Kafka</a>
+  </span>
+
+
+        
+
+        <span class="post-comment"><i class="icon icon-comment"></i> <a href="/2021/11/22/Kafka%E5%9F%BA%E7%A1%80%E5%8E%9F%E7%90%86/#comments" class="article-comment-link">评论</a></span>
+        
+      </div>
+    </div>
+    <div class="article-entry marked-body" itemprop="articleBody">
+      
+        <p>Kafka是最初由Linkedin公司开发，是一个分布式、支持分区的(partition)、多副本的(replica)，基于zookeeper协调的分布式消息系统，它的最大的特性就是可以实时的处理大量数据以满足各种需求场景:比如基于hadoop的批处理系统、低延迟的实时系统、Storm/Spark流式处理引擎，web/nginx日志、访问日志，消息服务等等，用scala语言编写， Linkedin于2010年贡献给了Apache基金会并成为顶级开源 项目。</p>
+<h1 id="使用场景"><a href="#使用场景" class="headerlink" title="使用场景"></a>使用场景</h1><ul>
+<li>日志收集：一个公司可以用Kafka收集各种服务的log，通过kafka以统一接口服务的方式开放给各种consumer，例如hadoop、Hbase、Solr等。</li>
+<li>消息系统：解耦和生产者和消费者、缓存消息等。 </li>
+<li>用户活动跟踪：Kafka经常被用来记录web用户或者app用户的各种活动，如浏览网页、搜索、点击等活动，这些活动信息被各个服务器发布到kafka的topic中，然后订阅者通过订阅这些topic来做实时的监控分析，或者装载到 hadoop、数据仓库中做离线分析和挖掘。</li>
+<li>运营指标：Kafka也经常用来记录运营监控数据。包括收集各种分布式应用的数据，生产各种操作的集中反馈，比如报警和报告。</li>
+</ul>
+<img src="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20211122140710.png" alt="image-20211122140710552" style="zoom:50%;" />
+
+
+
+<h1 id="基本概念"><a href="#基本概念" class="headerlink" title="基本概念"></a>基本概念</h1><p>kafka是一个分布式的，分区的消息(官方称之为commit log)服务。它提供一个消息系统应该具备的功能，但是确有着独特的设计。可以这样来说，Kafka借鉴了JMS规范的思想，但是确并没有完全遵循JMS规范。</p>
+<p>相关术语:</p>
+<p><img src="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20211122140856.png" alt="image-20211122140856928"></p>
+<p>从一个较高的层面上来看，producer通过网络发送消息到Kafka集群，然后consumer来进行消费，如下图:</p>
+<p><img src="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20211122141159.png" alt="image-20211122141159847"></p>
+<p>服务端(brokers)和客户端(producer、consumer)之间通信通过TCP协议来完成。</p>
+<h1 id="基本使用"><a href="#基本使用" class="headerlink" title="基本使用"></a>基本使用</h1><p>安装前的环境准备</p>
+<p>由于Kafka是用Scala语言开发的，运行在JVM上，因此在安装Kafka之前需要先安装JDK。</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">yum install java‐1.8.0‐openjdk* ‐y</span><br></pre></td></tr></table></figure>
+
+<p>kafka依赖zookeeper，所以需要先安装zookeeper</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line">wget https://mirror.bit.edu.cn/apache/zookeeper/zookeeper‐3.5.8/apache‐zookeeper‐3.5.8‐bin.tar.gz</span><br><span class="line">tar ‐zxvf apache‐zookeeper‐3.5.8‐bin.tar.gz</span><br><span class="line">cd apache‐zookeeper‐3.5.8‐bin</span><br><span class="line">cp conf/zoo_sample.cfg conf/zoo.cfg</span><br><span class="line"></span><br><span class="line"><span class="meta">#</span><span class="bash"> 启动zookeeper</span></span><br><span class="line">bin/zkServer.sh start</span><br><span class="line">bin/zkCli.sh</span><br><span class="line">ls /#查看zk的根目录相关节点</span><br></pre></td></tr></table></figure>
+
+<h2 id="下载安装包"><a href="#下载安装包" class="headerlink" title="下载安装包"></a>下载安装包</h2><p>下载2.4.1 release版本，并解压:</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#</span><span class="bash">2.11是scala的版本，2.4.1是kafka的版本</span></span><br><span class="line">wget https://mirror.bit.edu.cn/apache/kafka/2.4.1/kafka_2.11‐2.4.1.tgz</span><br><span class="line">tar ‐xzf kafka_2.11‐2.4.1.tgz</span><br><span class="line">cd kafka_2.11‐2.4.1</span><br></pre></td></tr></table></figure>
+
+<h2 id="修改配置"><a href="#修改配置" class="headerlink" title="修改配置"></a>修改配置</h2><p>修改配置文件config/server.properties:</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#</span><span class="bash">broker.id属性在kafka集群中必须要是唯一</span></span><br><span class="line">broker.id=0</span><br><span class="line"><span class="meta">#</span><span class="bash">kafka部署的机器ip和提供服务的端口号</span></span><br><span class="line">listeners=PLAINTEXT://192.168.65.60:9092 </span><br><span class="line"><span class="meta">#</span><span class="bash">kafka的消息存储文件</span></span><br><span class="line">log.dir=/usr/local/data/kafka‐logs</span><br><span class="line"><span class="meta">#</span><span class="bash">kafka连接zookeeper的地址</span></span><br><span class="line">zookeeper.connect=192.168.65.60:2181</span><br></pre></td></tr></table></figure>
+
+<h2 id="启动服务"><a href="#启动服务" class="headerlink" title="启动服务"></a>启动服务</h2><p>现在来启动kafka服务:<br>启动脚本语法: <code>kafka­-server-­start.sh [-­daemon] server.properties</code> 可以看到，server.properties的配置路径是一个强制的参数，<code>­-daemon</code>表示以后台进程运行，否则ssh客户端退出后， 就会停止服务。</p>
+<p>(注意，在启动kafka时会使用linux主机名关联的ip地址，所以需要把主机名和linux的ip映射配置到本地 host里，用vim /etc/hosts)</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#</span><span class="bash"> 启动kafka，运行日志在logs目录的server.log文件里</span></span><br><span class="line"></span><br><span class="line"><span class="meta">#</span><span class="bash">后台启动，不会打印日志到控制台</span></span><br><span class="line">bin/kafka‐server‐start.sh ‐daemon config/server.properties</span><br><span class="line"></span><br><span class="line"><span class="meta">#</span><span class="bash">或者用</span></span><br><span class="line">bin/kafka‐server‐start.sh config/server.properties&amp;</span><br><span class="line"></span><br><span class="line"><span class="meta">#</span><span class="bash">进入zookeeper目录通过zookeeper客户端查看下zookeeper的目录树</span></span><br><span class="line">bin/zkCli.sh</span><br><span class="line"><span class="meta">#</span><span class="bash">查看zk的根目录kafka相关节点</span></span><br><span class="line">ls /</span><br><span class="line"><span class="meta">#</span><span class="bash">查看kafka节点</span></span><br><span class="line">ls /brokers/ids</span><br><span class="line"><span class="meta">#</span><span class="bash">停止kafka</span></span><br><span class="line">bin/kafka‐server‐stop.sh</span><br></pre></td></tr></table></figure>
+
+<p>server.properties核心配置详解</p>
+<table>
+<thead>
+<tr>
+<th>参数</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><a target="_blank" rel="noopener" href="http://broker.id/">broker.id</a> =0</td>
+<td>每一个broker在集群中的唯一表示，要求是正数。当该服务器的IP地址发生改变时，broker.id没有变化，则不会影响consumers的消息情况</td>
+</tr>
+<tr>
+<td>log.dirs=/data/kafka-logs</td>
+<td>kafka数据的存放地址，多个地址的话用逗号分割,多个目录分布在不同磁盘上可以提高读写性能 /data/kafka-logs-1，/data/kafka-logs-2</td>
+</tr>
+<tr>
+<td>port =9092</td>
+<td>broker server服务端口</td>
+</tr>
+<tr>
+<td>message.max.bytes =6525000</td>
+<td>表示消息体的最大大小，单位是字节</td>
+</tr>
+<tr>
+<td>num.network.threads =4</td>
+<td>broker处理消息的最大线程数，一般情况下数量为cpu核数</td>
+</tr>
+<tr>
+<td>num.io.threads =8</td>
+<td>broker处理磁盘IO的线程数，数值为cpu核数2倍</td>
+</tr>
+<tr>
+<td>background.threads =4</td>
+<td>一些后台任务处理的线程数，例如过期消息文件的删除等，一般情况下不需要去做修改</td>
+</tr>
+<tr>
+<td>queued.max.requests =500</td>
+<td>等待IO线程处理的请求队列最大数，若是等待IO的请求超过这个数值，那么会停止接受外部消息，应该是一种自我保护机制。</td>
+</tr>
+<tr>
+<td><a target="_blank" rel="noopener" href="http://host.name/">host.name</a></td>
+<td>broker的主机地址，若是设置了，那么会绑定到这个地址上，若是没有，会绑定到所有的接口上，并将其中之一发送到ZK，一般不设置</td>
+</tr>
+<tr>
+<td>socket.send.buffer.bytes=100*1024</td>
+<td>socket的发送缓冲区，socket的调优参数SO_SNDBUFF</td>
+</tr>
+<tr>
+<td>socket.receive.buffer.bytes =100*1024</td>
+<td>socket的接受缓冲区，socket的调优参数SO_RCVBUFF</td>
+</tr>
+<tr>
+<td>socket.request.max.bytes =100<em>1024</em>1024</td>
+<td>socket请求的最大数值，防止serverOOM，message.max.bytes必然要小于socket.request.max.bytes，会被topic创建时的指定参数覆盖</td>
+</tr>
+<tr>
+<td>log.segment.bytes =1024<em>1024</em>1024</td>
+<td>topic的分区是以一堆segment文件存储的，这个控制每个segment的大小，会被topic创建时的指定参数覆盖</td>
+</tr>
+<tr>
+<td>log.roll.hours =24*7</td>
+<td>这个参数会在日志segment没有达到log.segment.bytes设置的大小，也会强制新建一个segment会被 topic创建时的指定参数覆盖</td>
+</tr>
+<tr>
+<td>log.cleanup.policy = delete</td>
+<td>日志清理策略选择有：delete和compact主要针对过期数据的处理，或是日志文件达到限制的额度，会被 topic创建时的指定参数覆盖</td>
+</tr>
+<tr>
+<td>log.retention.minutes=300 或 log.retention.hours=24</td>
+<td>数据文件保留多长时间， 存储的最大时间超过这个时间会根据log.cleanup.policy设置数据清除策略log.retention.bytes和log.retention.minutes或log.retention.hours任意一个达到要求，都会执行删除有2删除数据文件方式：按照文件大小删除：log.retention.bytes，按照2中不同时间粒度删除：分别为分钟，小时</td>
+</tr>
+<tr>
+<td>log.retention.bytes=-1</td>
+<td>topic每个分区的最大文件大小，一个topic的大小限制 = 分区数*log.retention.bytes。-1没有大小限log.retention.bytes和log.retention.minutes任意一个达到要求，都会执行删除，会被topic创建时的指定参数覆盖</td>
+</tr>
+<tr>
+<td>log.retention.check.interval.ms=5minutes</td>
+<td>文件大小检查的周期时间，是否处罚 log.cleanup.policy中设置的策略</td>
+</tr>
+<tr>
+<td>log.cleaner.enable=false</td>
+<td>是否开启日志清理</td>
+</tr>
+<tr>
+<td>log.cleaner.threads = 2</td>
+<td>日志清理运行的线程数</td>
+</tr>
+<tr>
+<td>log.cleaner.io.max.bytes.per.second=None</td>
+<td>日志清理时候处理的最大大小</td>
+</tr>
+<tr>
+<td>log.cleaner.dedupe.buffer.size=500<em>1024</em>1024</td>
+<td>日志清理去重时候的缓存空间，在空间允许的情况下，越大越好</td>
+</tr>
+<tr>
+<td>log.cleaner.io.buffer.size=512*1024</td>
+<td>日志清理时候用到的IO块大小一般不需要修改</td>
+</tr>
+<tr>
+<td>log.cleaner.io.buffer.load.factor =0.9</td>
+<td>日志清理中hash表的扩大因子一般不需要修改</td>
+</tr>
+<tr>
+<td><a target="_blank" rel="noopener" href="http://log.cleaner.backoff.ms/">log.cleaner.backoff.ms</a> =15000</td>
+<td>检查是否处罚日志清理的间隔</td>
+</tr>
+<tr>
+<td>log.cleaner.min.cleanable.ratio=0.5</td>
+<td>日志清理的频率控制，越大意味着更高效的清理，同时会存在一些空间上的浪费，会被topic创建时的指定参数覆盖</td>
+</tr>
+<tr>
+<td><a target="_blank" rel="noopener" href="http://log.cleaner.delete.retention.ms/">log.cleaner.delete.retention.ms</a> =1day</td>
+<td>对于压缩的日志保留的最长时间，也是客户端消费消息的最长时间，同log.retention.minutes的区别在于一个控制未压缩数据，一个控制压缩后的数据。会被topic创建时的指定参数覆盖</td>
+</tr>
+<tr>
+<td>log.index.size.max.bytes =10<em>1024</em>1024</td>
+<td>对于segment日志的索引文件大小限制，会被topic创建时的指定参数覆盖</td>
+</tr>
+<tr>
+<td>log.index.interval.bytes=4096</td>
+<td>当执行一个fetch操作后,需要一定的空间来扫描最近的offset大小，设置越大，代表扫描速度越快，但是也更好内存，一般情况下不需要搭理这个参数</td>
+</tr>
+<tr>
+<td>log.flush.interval.messages=None</td>
+<td>例如log.flush.interval.messages=1000表示每当消息记录数达到1000时flush一次数据到磁盘，log文件”sync”到磁盘之前累积的消息条数,因为磁盘IO操作是一个慢操作,但又是一个”数据可靠性”的必要手段,所以此参数的设置,需要在”数据可靠性”与”性能”之间做必要的权衡.如果此值过大,将会导致每次”fsync”的时间较长(IO阻塞),如果此值过小,将会导致”fsync”的次数较多,这也意味着整体的client请求有一定的延迟.物理server故障,将会导致没有fsync的消息丢失</td>
+</tr>
+<tr>
+<td><a target="_blank" rel="noopener" href="http://log.flush.scheduler.interval.ms/">log.flush.scheduler.interval.ms</a> =3000</td>
+<td>检查是否需要固化到硬盘的时间间隔</td>
+</tr>
+<tr>
+<td><a target="_blank" rel="noopener" href="http://log.flush.interval.ms/">log.flush.interval.ms</a> = None</td>
+<td>例如：log.flush.interval.ms=1000,表示每间隔1000毫秒flush一次数据到磁盘仅仅通过interval来控制消息的磁盘写入时机,是不足的.此参数用于控制”fsync”的时间间隔,如果消息量始终没有达到阀值,但是离上一次磁盘同步的时间间隔达到阀值,也将触发.</td>
+</tr>
+<tr>
+<td><a target="_blank" rel="noopener" href="http://log.delete.delay.ms/">log.delete.delay.ms</a> =60000</td>
+<td>文件在索引中清除后保留的时间一般不需要去修改</td>
+</tr>
+<tr>
+<td><a target="_blank" rel="noopener" href="http://log.flush.offset.checkpoint.interval.ms/">log.flush.offset.checkpoint.interval.ms</a> =60000</td>
+<td>控制上次固化硬盘的时间点，以便于数据恢复一般不需要去修改</td>
+</tr>
+<tr>
+<td>auto.create.topics.enable =true</td>
+<td>是否允许自动创建topic，若是false，就需要通过命令创建topic</td>
+</tr>
+<tr>
+<td>default.replication.factor =1</td>
+<td>是否允许自动创建topic，若是false，就需要通过命令创建topic</td>
+</tr>
+<tr>
+<td>num.partitions =1</td>
+<td>每个topic的分区个数，若是在topic创建时候没有指定的话会被topic创建时的指定参数覆盖</td>
+</tr>
+</tbody></table>
+<h2 id="创建主题"><a href="#创建主题" class="headerlink" title="创建主题"></a>创建主题</h2><p>现在我们来创建一个名字为“test”的Topic，这个topic只有一个partition，并且备份因子也设置为1:</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">bin/kafka‐topics.sh ‐‐create ‐‐zookeeper 192.168.65.60:2181 ‐‐replication‐factor 1 ‐‐partitions 1 ‐‐topic test</span><br></pre></td></tr></table></figure>
+
+<p>现在我们可以通过以下命令来查看kafka中目前存在的topic</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">bin&#x2F;kafka‐topics.sh ‐‐list ‐‐zookeeper 192.168.65.60:2181</span><br></pre></td></tr></table></figure>
+
+<p>除了我们通过手工的方式创建Topic，当producer发布一个消息到某个指定的Topic，这个Topic如果不存在，就自动创建。</p>
+<h3 id="删除主题"><a href="#删除主题" class="headerlink" title="删除主题"></a>删除主题</h3><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">bin&#x2F;kafka‐topics.sh ‐‐delete ‐‐topic test ‐‐zookeeper 192.168.65.60:2181</span><br></pre></td></tr></table></figure>
+
+<h2 id="发送消息"><a href="#发送消息" class="headerlink" title="发送消息"></a>发送消息</h2><p>kafka自带了一个producer命令客户端，可以从本地文件中读取内容，或者我们也可以以命令行中直接输入内容，并将这些内容以消息的形式发送到kafka集群中。在默认情况下，每一个行会被当做成一个独立的消息。 </p>
+<p>首先我们要运行发布消息的脚本，然后在命令中输入要发送的消息的内容:</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">bin&#x2F;kafka‐console‐producer.sh ‐‐broker‐list 192.168.65.60:9092 ‐‐topic test</span><br><span class="line">&gt;this is a msg</span><br><span class="line">&gt;this is a another msg</span><br></pre></td></tr></table></figure>
+
+<h2 id="消费消息"><a href="#消费消息" class="headerlink" title="消费消息"></a>消费消息</h2><p>对于consumer，kafka同样也携带了一个命令行客户端，会将获取到内容在命令中进行输出，默认是消费最新的消息:</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">bin&#x2F;kafka‐console‐consumer.sh ‐‐bootstrap‐server 192.168.65.60:9092 ‐‐topic test </span><br></pre></td></tr></table></figure>
+
+<p>如果想要消费之前的消息可以通过–from-beginning参数指定，如下命令:</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">bin&#x2F;kafka‐console‐consumer.sh ‐‐bootstrap‐server 192.168.65.60:9092 ‐‐from‐beginning ‐‐topic test</span><br></pre></td></tr></table></figure>
+
+<p>如果你是通过不同的终端窗口来运行以上的命令，你将会看到在producer终端输入的内容，很快就会在consumer的终端窗口上显示出来。</p>
+<p>以上所有的命令都有一些附加的选项;当我们不携带任何参数运行命令的时候，将会显示出这个命令的详细用法。</p>
+<h3 id="消费多主题"><a href="#消费多主题" class="headerlink" title="消费多主题"></a>消费多主题</h3><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">bin&#x2F;kafka‐console‐consumer.sh ‐‐bootstrap‐server 192.168.65.60:9092 ‐‐whitelist &quot;test|test‐2&quot;</span><br></pre></td></tr></table></figure>
+
+<h3 id="单播消费"><a href="#单播消费" class="headerlink" title="单播消费"></a>单播消费</h3><p>一条消息只能被某一个消费者消费的模式，类似queue模式，只需让所有消费者在同一个消费组里即可 分别在两个客户端执行如下消费命令，然后往主题里发送消息，结果只有一个客户端能收到消息</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">bin&#x2F;kafka‐console‐consumer.sh ‐‐bootstrap‐server 192.168.65.60:9092 ‐‐consumer‐property group.id&#x3D;testGroup ‐‐topic test</span><br></pre></td></tr></table></figure>
+
+<h3 id="多播消费"><a href="#多播消费" class="headerlink" title="多播消费"></a>多播消费</h3><p>一条消息能被多个消费者消费的模式，类似publish-subscribe模式费，针对Kafka同一条消息只能被同一个消费组下的某一个消费者消费的特性，要实现多播只要保证这些消费者属于不同的消费组即可。我们再增加一个消费者，该消费者属于testGroup-2消费 组，结果两个客户端都能收到消息</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">bin&#x2F;kafka‐console‐consumer.sh ‐‐bootstrap‐server 192.168.65.60:9092 ‐‐consumer‐property group.id&#x3D;testGroup‐2 ‐‐topic test</span><br></pre></td></tr></table></figure>
+
+<h3 id="查看消费组名"><a href="#查看消费组名" class="headerlink" title="查看消费组名"></a>查看消费组名</h3><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">bin&#x2F;kafka‐consumer‐groups.sh ‐‐bootstrap‐server 192.168.65.60:9092 ‐‐list</span><br></pre></td></tr></table></figure>
+
+<h3 id="查看消费组的消费偏移量"><a href="#查看消费组的消费偏移量" class="headerlink" title="查看消费组的消费偏移量"></a>查看消费组的消费偏移量</h3><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">bin&#x2F;kafka‐consumer‐groups.sh ‐‐bootstrap‐server 192.168.65.60:9092 ‐‐describe ‐‐group testGroup</span><br></pre></td></tr></table></figure>
+
+<p><img src="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20211122145133.png" alt="image-20211122145133743"></p>
+<p>current-offset:当前消费组的已消费偏移量 </p>
+<p>log-end-offset:主题对应分区消息的结束偏移量(HW)</p>
+<p>lag:当前消费组未消费的消息数</p>
+<h1 id="主题Topic和消息日志Log"><a href="#主题Topic和消息日志Log" class="headerlink" title="主题Topic和消息日志Log"></a>主题Topic和消息日志Log</h1><p>可以理解Topic是一个类别的名称，同类消息发送到同一个Topic下面。对于每一个Topic，下面可以有多个分区(Partition)日志文件:</p>
+<img src="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20211122145608.png" alt="image-20211122145608190" style="zoom:50%;" />
+
+<p>Partition是一个有序的message序列，这些message按顺序添加到一个叫做commit log的文件中。每个partition中的消息都有一个唯一的编号，称之为offset，用来唯一标示某个分区中的message。</p>
+<p>每个partition，都对应一个commit log文件。一个partition中的message的offset都是唯一的，但是不同的partition 中的message的offset可能是相同的。 kafka一般不会删除消息，不管这些消息有没有被消费。只会根据配置的日志保留时间(log.retention.hours)确认消息多久被删除，默认保留最近一周的日志消息。kafka的性能与保留的消息数据量大小没有关系，因此保存大量的数据消息日志信息不会有什么影响。</p>
+<p>每个consumer是基于自己在commit log中的消费进度(offset)来进行工作的。在kafka中，消费offset由consumer自己来维护;一般情况下我们按照顺序逐条消费commit log中的消息，当然我可以通过指定offset来重复消费某些消息， 或者跳过某些消息。 这意味kafka中的consumer对集群的影响是非常小的，添加一个或者减少一个consumer，对于集群或者其他consumer 来说，都是没有影响的，因为每个consumer维护各自的消费offset。</p>
+<h2 id="创建多个分区的主题"><a href="#创建多个分区的主题" class="headerlink" title="创建多个分区的主题"></a>创建多个分区的主题</h2><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">bin&#x2F;kafka‐topics.sh ‐‐create ‐‐zookeeper 192.168.65.60:2181 ‐‐replication ‐factor 1 ‐‐partitions 2 ‐‐topic test1</span><br></pre></td></tr></table></figure>
+
+<p>查看下topic的情况</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">bin&#x2F;kafka‐topics.sh ‐‐describe ‐‐zookeeper 192.168.65.60:2181 ‐‐topic test1</span><br></pre></td></tr></table></figure>
+
+<p><img src="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20211122173445.png" alt="image-20211122173445648"></p>
+<p>以下是输出内容的解释，第一行是所有分区的概要信息，之后的每一行表示每一个partition的信息。</p>
+<ul>
+<li>leader节点负责给定partition的所有读写请求。</li>
+<li>replicas 表示某个partition在哪几个broker上存在备份。不管这个几点是不是”leader“，甚至这个节点挂了，也会列出。 </li>
+<li>isr 是replicas的一个子集，它只列出当前还存活着的，并且已同步备份了该partition的节点。</li>
+</ul>
+<p>我们可以运行相同的命令查看之前创建的名称为”test“的topic</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">bin&#x2F;kafka‐topics.sh ‐‐describe ‐‐zookeeper 192.168.65.60:2181 ‐‐topic test</span><br></pre></td></tr></table></figure>
+
+<p><img src="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20211122181507.png" alt="image-20211122181507559"></p>
+<p>之前设置了topic的partition数量为1，备份因子为1，因此显示就如上所示了。</p>
+<p>可以进入kafka的数据文件存储目录查看test和test1主题的消息日志文件:</p>
+<p><img src="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20211122181817.png" alt="image-20211122181817678"></p>
+<p>消息日志文件主要存放在分区文件夹里的以log结尾的日志文件里，如下是test1主题对应的分区0的消息日志:</p>
+<p><img src="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20211122181836.png" alt="image-20211122181836204"></p>
+<p>当然我们也可以通过如下命令增加topic的分区数量(目前kafka不支持减少分区):</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">bin&#x2F;kafka‐topics.sh ‐alter ‐‐partitions 3 ‐‐zookeeper 192.168.65.60:2181 ‐‐topic test</span><br></pre></td></tr></table></figure>
+
+
+
+<h2 id="理解Topic，Partition和Broker"><a href="#理解Topic，Partition和Broker" class="headerlink" title="理解Topic，Partition和Broker"></a>理解Topic，Partition和Broker</h2><p>一个topic，代表逻辑上的一个业务数据集，比如按数据库里不同表的数据操作消息区分放入不同topic，订单相关操作消息放入订单topic，用户相关操作消息放入用户topic，对于大型网站来说，后端数据都是海量的，订单消息很可能是非常巨量的，比如有几百个G甚至达到TB级别，如果把这么多数据都放在一台机器上可定会有容量限制问题，那么就可以在 topic内部划分多个partition来分片存储数据，不同的partition可以位于不同的机器上，每台机器上都运行一个Kafka的 进程Broker。</p>
+<h2 id="为什么要对Topic下数据进行分区存储"><a href="#为什么要对Topic下数据进行分区存储" class="headerlink" title="为什么要对Topic下数据进行分区存储?"></a>为什么要对Topic下数据进行分区存储?</h2><p> 1、commit log文件会受到所在机器的文件系统大小的限制，分区之后可以将不同的分区放在不同的机器上，相当于对数据做了分布式存储，理论上一个topic可以处理任意数量的数据。<br> 2、为了提高并行度。</p>
+<h1 id="kafka集群实战"><a href="#kafka集群实战" class="headerlink" title="kafka集群实战"></a>kafka集群实战</h1><p>对于kafka来说，一个单独的broker意味着kafka集群中只有一个节点。要想增加kafka集群中的节点数量，只需要多启动几个broker实例即可。</p>
+<p>我们在一台机器上同时启动三个broker实例。 首先，建立好其他2个broker的配置文件:</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">cp config&#x2F;server.properties config&#x2F;server‐1.properties </span><br><span class="line">cp config&#x2F;server.properties config&#x2F;server‐2.properties</span><br></pre></td></tr></table></figure>
+
+<p>配置文件的需要修改的内容分别如下: </p>
+<p>config/server-1.properties:</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">#broker.id属性在kafka集群中必须要是唯一</span><br><span class="line">broker.id&#x3D;1</span><br><span class="line">#kafka部署的机器ip和提供服务的端口号</span><br><span class="line">listeners&#x3D;PLAINTEXT:&#x2F;&#x2F;192.168.65.60:9093</span><br><span class="line">log.dir&#x3D;&#x2F;usr&#x2F;local&#x2F;data&#x2F;kafka‐logs‐1</span><br><span class="line">#kafka连接zookeeper的地址，要把多个kafka实例组成集群，对应连接的zookeeper必须相同</span><br><span class="line">zookeeper.connect&#x3D;192.168.65.60:2181</span><br></pre></td></tr></table></figure>
+
+<p>config/server-2.properties:</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">broker.id&#x3D;2</span><br><span class="line">listeners&#x3D;PLAINTEXT:&#x2F;&#x2F;192.168.65.60:9094</span><br><span class="line">log.dir&#x3D;&#x2F;usr&#x2F;local&#x2F;data&#x2F;kafka‐logs‐2</span><br><span class="line">zookeeper.connect&#x3D;192.168.65.60:2181</span><br></pre></td></tr></table></figure>
+
+<p>目前已经有一个zookeeper实例和一个broker实例在运行了，现在我们只需要在启动2个broker实例即可:</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">bin&#x2F;kafka‐server‐start.sh ‐daemon config&#x2F;server‐1.properties </span><br><span class="line">bin&#x2F;kafka‐server‐start.sh ‐daemon config&#x2F;server‐2.properties</span><br></pre></td></tr></table></figure>
+
+<p>查看zookeeper确认集群节点是否都注册成功:</p>
+<p><img src="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20211123102753.png" alt="image-20211123102753045"></p>
+<p>现在我们创建一个新的topic，副本数设置为3，分区数设置为2:</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">bin&#x2F;kafka‐topics.sh ‐‐create ‐‐zookeeper 192.168.65.60:2181 ‐‐replication ‐factor 3 ‐‐partitions 2 ‐‐topic my‐replica ted‐topic</span><br></pre></td></tr></table></figure>
+
+<p>查看下topic的情况</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">bin&#x2F;kafka‐topics.sh ‐‐describe ‐‐zookeeper 192.168.65.60:2181 ‐‐topic my‐replicated‐topic</span><br></pre></td></tr></table></figure>
+
+<p><img src="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20211123102902.png" alt="image-20211123102902780"></p>
+<p>以下是输出内容的解释，第一行是所有分区的概要信息，之后的每一行表示每一个partition的信息。</p>
+<ul>
+<li>leader节点负责给定partition的所有读写请求，同一个主题不同分区leader副本一般不一样(为了容灾)</li>
+<li>replicas 表示某个partition在哪几个broker上存在备份。不管这个几点是不是”leader“，甚至这个节点挂了，也会列出。 </li>
+<li>isr 是replicas的一个子集，它只列出当前还存活着的，并且已同步备份了该partition的节点。</li>
+</ul>
+<p>现在我们向新建的 my-replicated-topic 中发送一些message，kafka集群可以加上所有kafka节点:</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">bin&#x2F;kafka‐console‐producer.sh ‐‐broker‐list 192.168.65.60:9092,192.168.65.60:9093,192.168.65.60:9094 ‐‐topic my‐repl icated‐topic</span><br><span class="line">&gt;my test msg1</span><br><span class="line">&gt;my test msg2</span><br></pre></td></tr></table></figure>
+
+<p>现在开始消费:</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">bin&#x2F;kafka‐console‐consumer.sh ‐‐bootstrap ‐server 192.168.65.60:9092,192.168.65.60:9093,192.168.65.60:9094 ‐‐from‐beg inning ‐‐topic my‐replicated‐topic</span><br><span class="line">my test msg1</span><br><span class="line">my test msg2</span><br></pre></td></tr></table></figure>
+
+<p>现在测试容错性，因为broker1目前是my-replicated-topic的分区0的leader，所以我们要将其kill</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">ps ‐ef|grep server.properties </span><br><span class="line">kill 14776</span><br></pre></td></tr></table></figure>
+
+<p>现在再执行命令:</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">bin&#x2F;kafka‐topics.sh ‐‐describe ‐‐zookeeper 192.168.65.60:9092 ‐‐topic my‐replicated‐topic</span><br></pre></td></tr></table></figure>
+
+<p><img src="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20211123103929.png" alt="image-20211123103929198"></p>
+<p>我们可以看到，分区0的leader节点已经变成了broker 0。要注意的是，在Isr中，已经没有了1号节点。leader的选举也是从ISR(in-sync replica)中进行的。<br>此时，我们依然可以消费新消息:</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">bin&#x2F;kafka‐console‐consumer.sh ‐‐bootstrap ‐server 192.168.65.60:9092,192.168.65.60:9093,192.168.65.60:9094 ‐‐from‐beg inning ‐‐topic my‐replicated‐topic</span><br><span class="line">my test msg1</span><br><span class="line">my test msg2</span><br></pre></td></tr></table></figure>
+
+<p>查看主题分区对应的leader信息:</p>
+<p><img src="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20211123104138.png" alt="image-20211123104138024"></p>
+<p>kafka将很多集群关键信息记录在zookeeper里，保证自己的无状态，从而在水平扩容时非常方便。</p>
+<h1 id="集群消费"><a href="#集群消费" class="headerlink" title="集群消费"></a>集群消费</h1><p>log的partitions分布在kafka集群中不同的broker上，每个broker可以请求备份其他broker上partition上的数据。</p>
+<p>kafka 集群支持配置一个partition备份的数量。 针对每个partition，都有一个broker起到“leader”的作用，0个或多个其他的broker作为“follwers”的作用。 leader处理所有的针对这个partition的读写请求，而followers被动复制leader的结果，不提供读写(主要是为了保证多 副本数据与消费的一致性)。如果这个leader失效了，其中的一个follower将会自动的变成新的leader。</p>
+<h2 id="Producers"><a href="#Producers" class="headerlink" title="Producers"></a>Producers</h2><p>生产者将消息发送到topic中去，同时负责选择将message发送到topic的哪一个partition中。通过round­-robin做简单的负载均衡。也可以根据消息中的某一个关键字来进行区分。通常第二种方式使用的更多。</p>
+<h2 id="Consumers"><a href="#Consumers" class="headerlink" title="Consumers"></a>Consumers</h2><p>传统的消息传递模式有2种:队列( queue) 和(publish-subscribe)</p>
+<ul>
+<li>queue模式:多个consumer从服务器中读取数据，消息只会到达一个consumer。</li>
+<li>publish-subscribe模式:消息会被广播给所有的consumer。</li>
+</ul>
+<p>Kafka基于这2种模式提供了一种consumer的抽象概念:consumer group。</p>
+<ul>
+<li>queue模式:所有的consumer都位于同一个consumer group 下。</li>
+<li>publish-subscribe模式:所有的consumer都有着自己唯一的consumer group。</li>
+</ul>
+<img src="https://hexo-img-1301602913.cos.ap-shanghai.myqcloud.com/20211123104831.png" alt="image-20211123104831310" style="zoom:50%;" />
+
+<p>上图说明:由2个broker组成的kafka集群，某个主题总共有4个partition(P0-P3)，分别位于不同的broker上。这个集群由2个Consumer Group消费， A有2个consumer instances ，B有4个。</p>
+<p>通常一个topic会有几个consumer group，每个consumer group都是一个逻辑上的订阅者( logical subscriber )。每个consumer group由多个consumer instance组成，从而达到可扩展和容灾的功能。</p>
+<h2 id="消费顺序"><a href="#消费顺序" class="headerlink" title="消费顺序"></a>消费顺序</h2><p>一个partition同一个时刻在一个consumer group中只能有一个consumer instance在消费，从而保证消费顺序。 consumer group中的consumer instance的数量不能比一个Topic中的partition的数量多，否则，多出来的 consumer消费不到消息。 Kafka只在partition的范围内保证消息消费的局部顺序性，不能在同一个topic中的多个partition中保证总的消费顺序 性。<br>如果有在总体上保证消费顺序的需求，那么我们可以通过将topic的partition数量设置为1，将consumer group中的 consumer instance数量也设置为1，但是这样会影响性能，所以kafka的顺序消费很少用。</p>
+
+      
+    </div>
+    <div class="article-footer">
+      <blockquote class="mt-2x">
+  <ul class="post-copyright list-unstyled">
+    
+    <li class="post-copyright-link hidden-xs">
+      <strong>本文链接：</strong>
+      <a href="https://tj-ever.github.io/2021/11/22/Kafka%E5%9F%BA%E7%A1%80%E5%8E%9F%E7%90%86/" title="Kafka 基本原理" target="_blank" rel="external">https://tj-ever.github.io/2021/11/22/Kafka基础原理/</a>
+    </li>
+    
+    <li class="post-copyright-license">
+      <strong>版权声明： </strong> 本博客所有文章除特别声明外，均采用 <a href="http://creativecommons.org/licenses/by/4.0/deed.zh" target="_blank" rel="external">CC BY 4.0 CN协议</a> 许可协议。转载请注明出处！
+    </li>
+  </ul>
+</blockquote>
+
+
+<div class="panel panel-default panel-badger">
+  <div class="panel-body">
+    <figure class="media">
+      <div class="media-left">
+        <a href="https://github.com/cofess" target="_blank" class="img-burn thumb-sm visible-lg">
+          <img src="/images/avatar.jpg" class="img-rounded w-full" alt="">
+        </a>
+      </div>
+      <div class="media-body">
+        <h3 class="media-heading"><a href="https://github.com/cofess" target="_blank"><span class="text-dark">Ever</span><small class="ml-1x">Ever的个人博客</small></a></h3>
+        <div>啊啊啊啊这功能做不了。</div>
+      </div>
+    </figure>
+  </div>
+</div>
+
+
+    </div>
+  </article>
+  
+    
+  <section id="comments">
+  	
+      <div id="vcomments"></div>
+    
+  </section>
+
+
+  
+</div>
+
+  <nav class="bar bar-footer clearfix" data-stick-bottom>
+  <div class="bar-inner">
+  
+  <ul class="pager pull-left">
+    
+    <li class="prev">
+      <a href="/2021/11/25/Kafka%20%E8%AE%BE%E8%AE%A1%E5%8E%9F%E7%90%86/" title="Kafka 设计原理"><i class="icon icon-angle-left" aria-hidden="true"></i><span>&nbsp;&nbsp;上一篇</span></a>
+    </li>
+    
+    
+    <li class="next">
+      <a href="/2021/11/01/Rabbitmq%E5%AE%9E%E7%8E%B0%E6%B6%88%E6%81%AF%E5%8F%AF%E9%9D%A0%E6%80%A7%E6%8A%95%E9%80%92/" title="Rabbitmq 消息可靠性投递两种方案"><span>下一篇&nbsp;&nbsp;</span><i class="icon icon-angle-right" aria-hidden="true"></i></a>
+    </li>
+    
+    
+  </ul>
+  
+  
+  <!-- Button trigger modal -->
+  <button type="button" class="btn btn-fancy btn-donate pop-onhover bg-gradient-warning" data-toggle="modal" data-target="#donateModal"><span>赏</span></button>
+  <!-- <div class="wave-icon wave-icon-danger btn-donate" data-toggle="modal" data-target="#donateModal">
+    <div class="wave-circle"><span class="icon"><i class="icon icon-bill"></i></span></div>
+  </div> -->
+  
+  
+  <div class="bar-right">
+    
+    <div class="share-component" data-sites="weibo,qq,wechat,facebook,twitter" data-mobile-sites="weibo,qq,qzone"></div>
+    
+  </div>
+  </div>
+</nav>
+  
+<!-- Modal -->
+<div class="modal modal-center modal-small modal-xs-full fade" id="donateModal" tabindex="-1" role="dialog">
+  <div class="modal-dialog" role="document">
+    <div class="modal-content donate">
+      <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+      <div class="modal-body">
+        <div class="donate-box">
+          <div class="donate-head">
+            <p>感谢您的支持，我会继续努力的!</p>
+          </div>
+          <div class="tab-content">
+            <div role="tabpanel" class="tab-pane fade active in" id="alipay">
+              <div class="donate-payimg">
+                <img src="/images/donate/alipayimg.png" alt="扫码支持" title="扫一扫" />
+              </div>
+              <p class="text-muted mv">扫码打赏，你说多少就多少</p>
+              <p class="text-grey">打开支付宝扫一扫，即可进行扫码打赏哦</p>
+            </div>
+            <div role="tabpanel" class="tab-pane fade" id="wechatpay">
+              <div class="donate-payimg">
+                <img src="/images/donate/wechatpayimg.png" alt="扫码支持" title="扫一扫" />
+              </div>
+              <p class="text-muted mv">扫码打赏，你说多少就多少</p>
+              <p class="text-grey">打开微信扫一扫，即可进行扫码打赏哦</p>
+            </div>
+          </div>
+          <div class="donate-footer">
+            <ul class="nav nav-tabs nav-justified" role="tablist">
+              <li role="presentation" class="active">
+                <a href="#alipay" id="alipay-tab" role="tab" data-toggle="tab" aria-controls="alipay" aria-expanded="true"><i class="icon icon-alipay"></i> 支付宝</a>
+              </li>
+              <li role="presentation" class="">
+                <a href="#wechatpay" role="tab" id="wechatpay-tab" data-toggle="tab" aria-controls="wechatpay" aria-expanded="false"><i class="icon icon-wepay"></i> 微信支付</a>
+              </li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+
+</main>
+
+  <footer class="footer" itemscope itemtype="http://schema.org/WPFooter">
+	
+	
+    <ul class="social-links">
+    	
+        <li><a href="https://weibo.com/u/2735829887" target="_blank" title="Weibo" data-toggle=tooltip data-placement=top><i class="icon icon-weibo"></i></a></li>
+        
+    </ul>
+
+    <div class="copyright">
+    	
+        <div class="publishby">
+        	Theme by <a href="https://github.com/cofess" target="_blank"> cofess </a>base on <a href="https://github.com/cofess/hexo-theme-pure" target="_blank">pure</a>.
+        </div>
+    </div>
+</footer>
+  <script src="//cdn.jsdelivr.net/npm/jquery@1.12.4/dist/jquery.min.js"></script>
+<script>
+window.jQuery || document.write('<script src="js/jquery.min.js"><\/script>')
+</script>
+
+<script src="/js/plugin.min.js"></script>
+
+
+<script src="/js/application.js"></script>
+
+
+    <script>
+(function (window) {
+    var INSIGHT_CONFIG = {
+        TRANSLATION: {
+            POSTS: '文章',
+            PAGES: '页面',
+            CATEGORIES: '分类',
+            TAGS: '标签',
+            UNTITLED: '(未命名)',
+        },
+        ROOT_URL: '/',
+        CONTENT_URL: '/content.json',
+    };
+    window.INSIGHT_CONFIG = INSIGHT_CONFIG;
+})(window);
+</script>
+
+<script src="/js/insight.js"></script>
+
+
+
+
+
+
+   
+
+
+
+
+   
+    
+  <script src="//cdn1.lncld.net/static/js/3.0.4/av-min.js"></script>
+  <script src="//cdn.jsdelivr.net/npm/valine"></script>
+  <script type="text/javascript">
+  var GUEST = ['nick', 'mail', 'link'];
+  var meta = 'nick,mail,link';
+  meta = meta.split(',').filter(function(item) {
+    return GUEST.indexOf(item) > -1;
+  });
+  new Valine({
+    el: '#vcomments',
+    verify: false,
+    notify: false,
+    appId: '',
+    appKey: '',
+    placeholder: 'Just go go',
+    avatar: 'mm',
+    meta: meta,
+    pageSize: '10' || 10,
+    visitor: false
+  });
+  </script>
+
+     
+
+
+
+
+
+
+
+</body>
+</html>
